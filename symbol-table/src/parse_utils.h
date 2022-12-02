@@ -11,6 +11,8 @@
 std::optional<std::string_view> consume_token(std::string_view &line,
                                               const char *ws = " \t\r\n");
 
+namespace {
+// make this function private
 template <size_t N>
 auto expect_params_impl(std::string_view &line, bool matched_before) {
   if constexpr (N == 0) {
@@ -22,8 +24,10 @@ auto expect_params_impl(std::string_view &line, bool matched_before) {
     return std::tuple_cat(std::make_tuple(token), std::move(rest));
   }
 }
+} // namespace
 
-/* parse N number of parameters, prints error message otherwise */
+/* Template magic: parse N number of parameters, prints error message otherwise
+ */
 template <size_t N>
 auto expect_params(std::string_view &line, std::string_view cmd) {
   auto ret = expect_params_impl<N>(line, true);

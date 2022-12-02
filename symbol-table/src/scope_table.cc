@@ -27,7 +27,7 @@ ScopeTable::~ScopeTable() {
  * to found node) */
 std::tuple<size_t, size_t, SymbolInfo *, SymbolInfo *>
 ScopeTable::find_helper(std::string_view name) {
-  size_t h = sdbm_hash(name) % num_buckets_;
+  size_t h = sdbm_hash(name, num_buckets_);
   size_t idx = 0;
   SymbolInfo *curr = table_[h], *prev = nullptr;
 
