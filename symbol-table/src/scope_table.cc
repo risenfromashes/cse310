@@ -1,6 +1,5 @@
 #include "scope_table.h"
 #include <fstream>
-#include <spdlog/spdlog.h>
 
 /* Use allocators instead of new for flexibility */
 ScopeTable::ScopeTable(size_t num_buckets, ScopeTable *parent)
