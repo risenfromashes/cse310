@@ -8,7 +8,7 @@ ScopeTable::ScopeTable(size_t num_buckets, ScopeTable *parent)
   table_ = allocator_.allocate(num_buckets);
   /* initialise buckets to nullptr */
   std::fill(table_, table_ + num_buckets, nullptr);
-  Log::writeln("\t\tScopeTable# {} created", id_);
+  Log::writeln("\tScopeTable# {} created", id_);
 }
 
 ScopeTable::~ScopeTable() {
@@ -20,7 +20,7 @@ ScopeTable::~ScopeTable() {
     }
   }
   allocator_.deallocate(table_, num_buckets_);
-  Log::writeln("\t\tScopeTable# {} removed", id_);
+  Log::writeln("\tScopeTable# {} removed", id_);
 }
 
 /* Returns hash, position of node, previous pointer and current pointer (w.r.t
@@ -55,19 +55,19 @@ bool ScopeTable::insert(std::string_view name, std::string_view type) {
       table_[h] = new_node;
     }
 
-    Log::writeln("\t\tInserted in ScopeTable# {} at position {}, {}", id_,
-                 h + 1, i + 1);
+    Log::writeln("\tInserted in ScopeTable# {} at position {}, {}", id_, h + 1,
+                 i + 1);
   }
 
-  return false;
+  return !curr;
 }
 
 /* Return curr pointer */
 SymbolInfo *ScopeTable::look_up(std::string_view name) {
   auto [h, i, _, curr] = find_helper(name);
   if (curr) {
-    Log::writeln("\t\t'{}' found in ScopeTable# {} at position {}, {}", name,
-                 id_, h + 1, i + 1);
+    Log::writeln("\t'{}' found in ScopeTable# {} at position {}, {}", name, id_,
+                 h + 1, i + 1);
   }
   return curr;
 }
@@ -87,18 +87,16 @@ bool ScopeTable::remove(std::string_view name) {
     std::destroy_at(curr);
     symbol_allocator_.deallocate(curr, 1);
 
-    Log::writeln("\t\tDeleted '{}' from ScopeTable# {} at position {}, {}",
-                 name, id_, h + 1, i + 1);
-
-    return true;
+    Log::writeln("\tDeleted '{}' from ScopeTable# {} at position {}, {}", name,
+                 id_, h + 1, i + 1);
   }
-  return false;
+  return curr;
 }
 
 void ScopeTable::log() {
-  Log::writeln("\t\tScopeTable# {}", id_);
+  Log::writeln("\tScopeTable# {}", id_);
   for (size_t i = 0; i < num_buckets_; i++) {
-    Log::write("\t\t{}-->", i + 1);
+    Log::write("\t{}--> ", i + 1);
     for (SymbolInfo *p = table_[i]; p; p = p->next()) {
       p->log();
     }

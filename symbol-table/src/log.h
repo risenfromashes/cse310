@@ -28,7 +28,7 @@ public:
   /* Write formatted string to log */
   template <class... T>
   static void write(fmt::format_string<T...> fmt_string, T &&...args) {
-    fmt::print(out_file_, fmt_string, std::forward<decltype(args)...>(args)...);
+    fmt::print(out_file_, fmt_string, std::forward<decltype(args)>(args)...);
   }
 
   /* Write plain string to log */
@@ -37,7 +37,7 @@ public:
   /* Write formatted string to log and end line */
   template <class... T>
   static void writeln(fmt::format_string<T...> fmt_string, T &&...args) {
-    fmt::print(out_file_, fmt_string, std::forward<decltype(args)...>(args)...);
+    fmt::print(out_file_, fmt_string, std::forward<decltype(args)>(args)...);
     endl();
   }
 

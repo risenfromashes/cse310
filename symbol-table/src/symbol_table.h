@@ -6,6 +6,7 @@
 class SymbolTable {
 public:
   SymbolTable(size_t init_bucket_size);
+  ~SymbolTable();
 
   /* enter into new scope, creating new scope table */
   void enter_scope();

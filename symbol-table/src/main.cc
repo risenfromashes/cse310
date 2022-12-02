@@ -20,8 +20,8 @@ int main(int argc, char **argv) {
     }
   }
 
-  std::ifstream in(out_file);
-  Log::set_out_file(in_file);
+  std::ifstream in(in_file);
+  Log::set_out_file(out_file);
 
   size_t num_buckets;
   std::string line;
@@ -31,21 +31,21 @@ int main(int argc, char **argv) {
   // Construct SymbolTable
   SymbolTable table(num_buckets);
 
-  for (size_t i = 0; std::getline(in, line); i++) {
+  for (size_t i = 1; std::getline(in, line); i++) {
 
     std::string_view lv = line;
     auto cmd = consume_token(lv);
     bool quit = false;
 
-    Log::writeln("Cmd {}:\t{}", i, lv);
+    Log::writeln("Cmd {}: {}", i, line);
 
     if (!cmd) {
-      Log::writeln("\t\tCommand missing on line {}.", i);
+      Log::writeln("\tCommand missing on line {}.", i);
       continue;
     }
 
     if (cmd->size() > 1) {
-      Log::writeln("\t\tInvalid command '{}' on line {}.", *cmd, i);
+      Log::writeln("\tInvalid command '{}' on line {}.", *cmd, i);
       continue;
     }
 
@@ -74,14 +74,12 @@ int main(int argc, char **argv) {
     case 'P': {
       auto [mode, match] = expect_params<1>(lv, *cmd);
       if (match) {
-        if (mode->size() > 1) {
-          if (*mode == "A") {
-            table.log_all_scopes();
-          } else if (*mode == "C") {
-            table.log_current_scope();
-          } else {
-            Log::writeln("Invalid parameter for command P on line {}", i);
-          }
+        if (*mode == "A") {
+          table.log_all_scopes();
+        } else if (*mode == "C") {
+          table.log_current_scope();
+        } else {
+          Log::writeln("Invalid parameter for command P on line {}", i);
         }
       }
       break;

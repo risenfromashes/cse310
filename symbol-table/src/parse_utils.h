@@ -28,7 +28,7 @@ template <size_t N>
 auto expect_params(std::string_view &line, std::string_view cmd) {
   auto ret = expect_params_impl<N>(line, true);
   if (!std::get<N>(ret)) {
-    Log::writeln("\t\tNumber of parameters mismatch for the  command {}", cmd);
+    Log::writeln("\tNumber of parameters mismatch for the command {}", cmd);
   }
   return ret;
 }
