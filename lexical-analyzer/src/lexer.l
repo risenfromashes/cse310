@@ -37,31 +37,33 @@ floatbase ({digit}+\.{digit}*|\.{digit}+)
 float ({floatbase}{exp}?|{digit}+{exp})[fFlL]?
 
 illfloatbase {floatbase}(\.{digit}*)+
-illexp ([Ee][-+]?({floatbase}|{illfloatbase}))
-illfloat ({floatbase}{illexp}|{illfloatbase}{exp}?|{illfloatbase}{illexp}|{digit}+{illexp})
+illexp ([Ee]([-+]?({floatbase}|{illfloatbase}))?)
+illdecimal {illfloatbase}({illexp}|{exp})?
+illfloat ({floatbase}{illexp}|{digit}+{illexp})
 
 escape ["'?\\abfnrtv]
+illescape [^"'?\\abfnrtv]
 char ([^"'\\\r\n]|\\{escape}|\\[0-7]{1,3})
 charlit \'(["]|{char})\'
 strlit \"([']|{char})*\"
-cmnt \/\/([^\n]|\\{sp}*{lf})*
 
 illcharlit \'(["]|{char}){2,}\'
 emptycharlit \'\'
-unfcharlit \'((["]|{char})|(\\\'))?
+unfcharlit \'(["]|{char})?
+badcharlit \'\\{illescape}\'
 
 %%
 
 {ws} { /* do nothing */ }
 
-"\/\/"                              { append(yytext); startline(yylineno); BEGIN(SCMNT); }
-<SCMNT>([^\r\n\\]|\\{sp}*{crlf}?)*  { append(yytext); }
-<SCMNT>{crlf}                       { log(COMMENT);                        BEGIN(INITIAL); }
+"\/\/"                         { append(yytext); startline(yylineno); BEGIN(SCMNT); }
+<SCMNT>{crlf}                  { log(COMMENT);                        BEGIN(INITIAL); }
+<SCMNT>([^\r\n\\]|\\{crlf})+|. { append(yytext); }
 
-"/*"                   { append(yytext); yyextra->start_line(yylineno); BEGIN(CMNT); }
-<CMNT>"*/"             { append(yytext); log(MULTI_LINE_COMMENT);       BEGIN(INITIAL); }
-<CMNT>([^*]|{crlf})+|. { append(yytext); }
-<CMNT><<EOF>>          { report("UNFINISHED_COMMENT");                  return 0; }
+"/*"                       { append(yytext); startline(yylineno);     BEGIN(CMNT); }
+<CMNT>"*/"                 { append(yytext); log(MULTI_LINE_COMMENT); BEGIN(INITIAL); }
+<CMNT>([^*\r\n]|{crlf})+|. { append(yytext); }
+<CMNT><<EOF>>              { report("UNFINISHED_COMMENT");            return 0; }
 
 
 if        { log(IF); }   
@@ -100,25 +102,26 @@ continue  { log(CONTINUE); }
 
 {int}   { log(CONST_INT); }
 {float} { log(CONST_FLOAT); }
+{id}    { log(ID); }
 
-{illfloatbase}  { report("TOO_MANY_DECIMAL_POINTS"); }
+{illintid}      { report("INVALID_ID_SUFFIX_NUM_PREFIX"); }
+{illdecimal}    { report("TOO_MANY_DECIMAL_POINTS"); }
 {illfloat}      { report("ILLFORMED_NUMBER"); }
 
 {charlit}      { log(CONST_CHAR); }
 {strlit}       { log(STRING); }
 
-\"([']|{char})*                   { append(yytext); startline(yylineno);    BEGIN(MSTR); }
-<MSTR>\"                          { append(yytext); log(MULTI_LINE_STRING); BEGIN(INITIAL); }
-<MSTR>([']|{char}|\\{sp}*{crlf})* { append(yytext); ; }
-<MSTR>{crlf}                      { report("UNFINISHED_STRING");            BEGIN(INITIAL); }
-<MSTR><<EOF>>                     { report("UNFINISHED_STRING");            return 0; }
+\"([']|{char})*                 { append(yytext); startline(yylineno);    BEGIN(MSTR); }
+<MSTR>\"                        { append(yytext); log(MULTI_LINE_STRING); BEGIN(INITIAL); }
+<MSTR>([']|{char}|\\{crlf})+|.  { append(yytext); }
+<MSTR>{crlf}                    { report("UNFINISHED_STRING");            BEGIN(INITIAL); }
+<MSTR><<EOF>>                   { report("UNFINISHED_STRING");            return 0; }
 
 {unfcharlit}   { report("UNFINISHED_CONST_CHAR"); } 
-{emptycharlit} { report("EMPTY_CONST_CHAR"); }
 {illcharlit}   { report("MULTICHAR_CONST_CHAR"); } 
+{emptycharlit} { report("EMPTY_CONST_CHAR"); }
+{badcharlit}   { report("UNRECOGNIZED_ESCAPE_SEQUENCE"); }
 
-{id}        { log(ID); }
-{illintid}  { report("INVALID_ID_SUFFIX_NUM_PREFIX"); }
 
 . { report("UNRECOGNIZED_CHAR"); }
 
@@ -127,6 +130,7 @@ continue  { log(CONTINUE); }
 #undef log
 #undef report
 #undef append
+#undef startline
 
 void scan_file(ParserContext* context, FILE* in)
 {

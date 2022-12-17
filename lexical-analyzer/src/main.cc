@@ -11,8 +11,10 @@
 #include "symbol_table.h"
 
 int main(int argc, char **argv) {
+  int8_t i = -128;
+  int8_t j = 3 - i;
   const char *in_file = "../sample_input.txt";
-  const char *out_file = "output.txt";
+  const char *out_file = "token.txt";
   const char *log_file = "log.txt";
   // set input and output from command line
   for (int i = 1; i < argc - 1; i++) {

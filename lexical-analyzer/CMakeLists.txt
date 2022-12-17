@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(cse310-assignment-1)
+project(cse310-assignment-2)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -16,7 +16,7 @@ find_package(FLEX)
 FLEX_TARGET(scanner src/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/lexer.yy.cc
             DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/lexer.yy.h)
 
-add_executable(main 
+add_executable(lexer 
   src/main.cc
   ${FLEX_scanner_OUTPUTS}
   src/parser_context.h
@@ -32,5 +32,5 @@ add_executable(main
   src/symbol_info.h
 )
 
-target_link_libraries(main PRIVATE fmt::fmt)
-target_include_directories(main PRIVATE src/ ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(lexer PRIVATE fmt::fmt)
+target_include_directories(lexer PRIVATE src/ ${CMAKE_CURRENT_BINARY_DIR})
