@@ -2,6 +2,8 @@
 
 #include <log.h>
 
+#include <parser.tab.h>
+
 Token::Token(Type type) : type_(type) {}
 
 Token::Token(Type type, std::string &&str)

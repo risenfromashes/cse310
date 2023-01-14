@@ -1,10 +1,17 @@
 #include "parser_context.h"
 #include "token.h"
 
-ParserContext::ParserContext() : error_count_(0), table_(10) { init_scanner(); }
+#include <parser.tab.h>
+
+ParserContext::ParserContext(FILE *input)
+    : error_count_(0), table_(10), in_file_(input) {
+  init_scanner();
+}
+
 ParserContext::~ParserContext() { finish_scanner(); }
 
-Token ParserContext::new_token(int lineno, const char *text, Token::Type type) {
+Token *ParserContext::new_token(int lineno, const char *text,
+                                Token::Type type) {
   std::string val;
   std::string_view lexeme;
   int line = lineno;
@@ -32,8 +39,8 @@ Token ParserContext::new_token(int lineno, const char *text, Token::Type type) {
     break;
   }
 
-  Token token(type, std::move(val));
-  Log::write("Line# {}: Token <{}> Lexeme {} found\n", line, token.type_str(),
+  Token *token = new Token(type, std::move(val));
+  Log::write("Line# {}: Token <{}> Lexeme {} found\n", line, token->type_str(),
              lexeme);
 
   buf_.clear();

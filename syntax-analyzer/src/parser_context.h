@@ -8,14 +8,14 @@
 
 class ParserContext {
 public:
-  ParserContext();
+  ParserContext(FILE *input);
   ~ParserContext();
 
   void *scanner() { return scanner_; }
 
   void append_buf(std::string_view str);
 
-  Token new_token(int lineno, const char *text, Token::Type type);
+  Token *new_token(int lineno, const char *text, Token::Type type);
 
   void report_error(int lineno, const char *text, const char *error_type);
 
@@ -50,4 +50,6 @@ private:
   int column_ = 1;
 
   void *scanner_;
+
+  FILE *in_file_;
 };

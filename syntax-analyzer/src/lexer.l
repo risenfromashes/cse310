@@ -3,7 +3,7 @@
 
 #include <parser.tab.h>
 
-#define new_token(type) *yylval = yyextra->new_token_token(yylineno, yytext, type)
+#define new_token(type) yylval->token = yyextra->new_token(yylineno, yytext, type)
 #define report(error) yyextra->report_error(yylineno, yytext, error)
 #define append(str)  yyextra->append_buf(str)
 #define startline(line) yyextra->start_line(line)
@@ -121,14 +121,14 @@ continue  { new_token(CONTINUE); return CONTINUE; }
 {charlit}      { new_token(CONST_CHAR); return CONST_CHAR; }
 {strlit}       { new_token(STRING);     return STRING;     }
 
-\"([']|{char})*                 { append(yytext); startline(yylineno); start_col(yyextra->col()); BEGIN(MSTR); }
+\"([']|{char})*                 { append(yytext); startline(yylineno); startcol(yyextra->col()); BEGIN(MSTR); }
 <MSTR>\"                        { 
   append(yytext); 
   new_token(MULTI_LINE_STRING); 
   yylloc->first_line = yyextra->start_line();
   yylloc->last_line = yylineno;
-  yylloc->first_col = yyextra->start_col();
-  yylloc->last_col = yycolumn;
+  yylloc->first_column = yyextra->start_col();
+  yylloc->last_column = yycolumn;
   BEGIN(INITIAL);   
   return MULTI_LINE_STRING; 
 }
@@ -147,14 +147,14 @@ continue  { new_token(CONTINUE); return CONTINUE; }
 
 %%
 
-void ParserContext::init_scanner(ParserContext* context)
+void ParserContext::init_scanner()
 {
-    yylex_init_extra(context, &scanner_);
-    yyset_in(in, scanner_);
+    yylex_init_extra(this, &scanner_);
+    yyset_in(in_file_, scanner_);
 }
 
 void ParserContext::finish_scanner(){
-    context->finish(yyget_lineno(scanner_));
+    finish(yyget_lineno(scanner_));
     yylex_destroy(scanner_);
 }
 

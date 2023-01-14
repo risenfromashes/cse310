@@ -1,28 +1,44 @@
-%language "C++"
+%define api.pure full
 
-%define api.token.constructor false
-%define api.value.type variant
+%param {void * scanner}
 %parse-param {ParserContext* context}
+
 %locations
+
+%code requires{
+
+#include <cstdio>
+#include <cstdarg>
+#include <token.h>
+#include <parser_context.h>
+#define YYLEX_PARAM context->scanner()
+
+}
+
+
+%union {
+  Token* token;
+  SymbolInfo* symbol_info;
+};
 
 %{
 
-#include <cstdio>
-#include <token.h>
-
-#define YYLEX_PARAM context->scanner()
-
 int yylex(YYSTYPE* lvalp, YYLTYPE* llocp, void* scanner);
-void yyerror(YYLTYPE* locp, ParserContext* context, const char *s, ...); 
+void yyerror(YYLTYPE* locp, void* scanner, ParserContext* context, const char *s, ...); 
 void lyyerror(YYLTYPE t, char *s, ...); 
 
 %}
 
-/* regular tokens */
-%token <Token> IF ELSE FOR WHILE DO BREAK INT CHAR FLOAT DOUBLE VOID RETURN SWITCH CASE DEFAULT 
-%token <Token> CONTINUE CONST_INT CONST_FLOAT CONST_CHAR ADDOP MULOP INCOP DECOP RELOP ASSIGNOP LOGICOP 
-%token <Token> BITOP NOT LPAREN RPAREN LCURL RCURL LSQUARE RSQUARE COMMA SEMICOLON ID STRING MULTI_LINE_STRING
 
+/* regular tokens */
+%token <token> IF ELSE FOR WHILE DO BREAK INT CHAR FLOAT DOUBLE VOID RETURN SWITCH CASE DEFAULT 
+%token <token> CONTINUE CONST_INT CONST_FLOAT CONST_CHAR ADDOP MULOP INCOP DECOP RELOP ASSIGNOP LOGICOP 
+%token <token> BITOP NOT LPAREN RPAREN LCURL RCURL LSQUARE RSQUARE COMMA SEMICOLON ID STRING MULTI_LINE_STRING
+
+
+/* precedence rules */
+%nonassoc UNMATCHED_ELSE
+%nonassoc ELSE
 
 %%
 
@@ -83,7 +99,7 @@ statement : var_declaration
 	  | expression_statement
 	  | compound_statement
 	  | FOR LPAREN expression_statement expression_statement expression RPAREN statement
-	  | IF LPAREN expression RPAREN statement
+	  | IF LPAREN expression RPAREN statement %prec UNMATCHED_ELSE {}
 	  | IF LPAREN expression RPAREN statement ELSE statement
 	  | WHILE LPAREN expression RPAREN statement
 	  /* | PRINTLN LPAREN ID RPAREN SEMICOLON */
@@ -143,10 +159,10 @@ arguments : arguments COMMA logic_expression
 
 %%
 
-void yyerror(YYLTYPE* locp, ParserContext* context, const char *s, ...) {
+void yyerror(YYLTYPE* locp, void* scanner, ParserContext* context, const char *s, ...) {
   va_list ap;
   va_start(ap, s);
-  if(t.first_line) {
+  if(locp->first_line) {
     std::fprintf(stderr, "Line #%d: error: ", locp->first_line);
   }
   vfprintf(stderr, s, ap);

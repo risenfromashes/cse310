@@ -18,6 +18,7 @@ FLEX_TARGET(scanner src/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/lexer.yy.cc
             DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/lexer.yy.h)
 
 BISON_TARGET(parser src/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.cc
+            COMPILE_FLAGS "-Wcounterexamples"
             DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.h)
 
 add_executable(parser

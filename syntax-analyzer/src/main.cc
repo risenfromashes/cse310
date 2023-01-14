@@ -34,7 +34,7 @@ int main(int argc, char **argv) {
   std::FILE *in = std::fopen(in_file, "r");
 
   if (in) {
-    ParserContext context;
+    ParserContext context(in);
   } else {
     fmt::print(stderr, "Couldn't access input file: {}", in_file);
   }
