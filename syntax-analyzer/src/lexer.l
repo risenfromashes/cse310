@@ -1,7 +1,9 @@
 %{
 #include <parser_context.h>
 
-#define new_token(type) yylval.token = yyextra->new_token_token(yylineno, yytext, type)
+#include <parser.tab.h>
+
+#define new_token(type) *yylval = yyextra->new_token_token(yylineno, yytext, type)
 #define report(error) yyextra->report_error(yylineno, yytext, error)
 #define append(str)  yyextra->append_buf(str)
 #define startline(line) yyextra->start_line(line)
@@ -11,8 +13,8 @@
 #define YY_USER_ACTION \
   yylloc->first_line = yylloc->last_line = yylineno; \
   yylloc->first_column = yycolumn; \
-  yylloc->last_column = yycolumn + yyleng - 1; \
-  yyextra->col(yylloc->last_column + 1);
+  yylloc->last_column = yycolumn + yyleng - 1;
+
 %}
 
 %option reentrant noyywrap nodefault yylineno bison-bridge bison-locations
@@ -67,8 +69,8 @@ badcharlit \'\\{illescape}\'
 <SCMNT>{crlf}                  { new_token(COMMENT);                  BEGIN(INITIAL); }
 <SCMNT>([^\r\n\\]|\\{crlf})+|. { append(yytext); }
 
-"/*"                       { append(yytext); startline(yylineno);                       BEGIN(CMNT); }
-<CMNT>"*/"                 { append(yytext); new_token(MULTI_LINE_COMMENT);             BEGIN(INITIAL); }
+"/*"                       { append(yytext); startline(yylineno);           BEGIN(CMNT); }
+<CMNT>"*/"                 { append(yytext); new_token(MULTI_LINE_COMMENT); BEGIN(INITIAL); }
 <CMNT>([^*\r\n]|{crlf})+|. { append(yytext); }
 <CMNT><<EOF>>              { report("UNFINISHED_COMMENT"); return YYEOF; }
 
@@ -92,7 +94,8 @@ continue  { new_token(CONTINUE); return CONTINUE; }
 
 "+"|"-"                     { new_token(ADDOP);     return ADDOP;     }
 "*"|"/"|"%"                 { new_token(MULOP);     return MULOP;     } 
-"++"|"--"                   { new_token(INCOP);     return INCOP;     } 
+"++"                        { new_token(INCOP);     return INCOP;     } 
+"--"                        { new_token(INCOP);     return DECOP;     } 
 "<"|">"|"<="|">="|"=="|"!=" { new_token(RELOP);     return RELOP;     } 
 "="                         { new_token(ASSIGNOP);  return ASSIGNOP;  } 
 "&&"|"||"                   { new_token(LOGICOP);   return LOGICOP;   } 
@@ -122,10 +125,10 @@ continue  { new_token(CONTINUE); return CONTINUE; }
 <MSTR>\"                        { 
   append(yytext); 
   new_token(MULTI_LINE_STRING); 
-  yylloc.first_line = yyextra->start_line();
-  yylloc.last_line = yylineno;
-  yylloc.first_col = yyextra->start_col();
-  yyllloc.last_col = yycolumn;
+  yylloc->first_line = yyextra->start_line();
+  yylloc->last_line = yylineno;
+  yylloc->first_col = yyextra->start_col();
+  yylloc->last_col = yycolumn;
   BEGIN(INITIAL);   
   return MULTI_LINE_STRING; 
 }
@@ -144,14 +147,15 @@ continue  { new_token(CONTINUE); return CONTINUE; }
 
 %%
 
-void scan(ParserContext* context, FILE* in)
+void ParserContext::init_scanner(ParserContext* context)
 {
-    yyscan_t scanner;
-    yylex_init_extra(context, &scanner);
-    yyset_in(in, scanner);
-    yylex(scanner);
-    context->finish(yyget_lineno(scanner));
-    yylex_destroy(scanner);
+    yylex_init_extra(context, &scanner_);
+    yyset_in(in, scanner_);
+}
+
+void ParserContext::finish_scanner(){
+    context->finish(yyget_lineno(scanner_));
+    yylex_destroy(scanner_);
 }
 
 

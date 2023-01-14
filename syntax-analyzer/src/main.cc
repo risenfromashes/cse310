@@ -5,7 +5,6 @@
 #include <optional>
 #include <tuple>
 
-#include "lexer.h"
 #include "log.h"
 #include "parser_context.h"
 #include "symbol_table.h"
@@ -36,7 +35,6 @@ int main(int argc, char **argv) {
 
   if (in) {
     ParserContext context;
-    scan_file(&context, in);
   } else {
     fmt::print(stderr, "Couldn't access input file: {}", in_file);
   }

@@ -9,6 +9,9 @@
 class ParserContext {
 public:
   ParserContext();
+  ~ParserContext();
+
+  void *scanner() { return scanner_; }
 
   void append_buf(std::string_view str);
 
@@ -35,6 +38,9 @@ public:
   void finish(int line);
 
 private:
+  void init_scanner();
+  void finish_scanner();
+
   std::string buf_;
   int error_count_;
   SymbolTable table_;
@@ -42,4 +48,6 @@ private:
   int start_line_ = 1;
   int start_col_ = 1;
   int column_ = 1;
+
+  void *scanner_;
 };

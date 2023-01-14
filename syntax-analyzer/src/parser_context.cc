@@ -1,7 +1,8 @@
 #include "parser_context.h"
 #include "token.h"
 
-ParserContext::ParserContext() : error_count_(0), table_(10) {}
+ParserContext::ParserContext() : error_count_(0), table_(10) { init_scanner(); }
+ParserContext::~ParserContext() { finish_scanner(); }
 
 Token ParserContext::new_token(int lineno, const char *text, Token::Type type) {
   std::string val;

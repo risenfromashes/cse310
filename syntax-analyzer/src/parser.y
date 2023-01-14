@@ -1,62 +1,27 @@
-%define api.pure full 
+%language "C++"
+
+%define api.token.constructor false
 %define api.value.type variant
-%param {ParserContext *context}
-%location
+%parse-param {ParserContext* context}
+%locations
 
 %{
 
 #include <cstdio>
+#include <token.h>
 
-int yylex(YYSTYPE* lvalp, YYLTYPE* llocp, ParserContext* context);
-int yyparse(ParserContext* context);
-void yyerror(YYLTYPE* locp, const char *s, ...); 
+#define YYLEX_PARAM context->scanner()
+
+int yylex(YYSTYPE* lvalp, YYLTYPE* llocp, void* scanner);
+void yyerror(YYLTYPE* locp, ParserContext* context, const char *s, ...); 
 void lyyerror(YYLTYPE t, char *s, ...); 
 
 %}
 
-%token 
-  IF
-  ELSE
-  FOR
-  WHILE
-  DO
-  BREAK
-  INT
-  CHAR
-  FLOAT
-  DOUBLE
-  VOID
-  RETURN
-  SWITCH
-  CASE
-  DEFAULT
-  CONTINUE
-  CONST_INT
-  CONST_FLOAT
-  CONST_CHAR
-  ADDOP
-  MULOP
-  INCOP
-  RELOP
-  ASSIGNOP
-  LOGICOP
-  BITOP
-  NOT
-  LPAREN
-  RPAREN
-  LCURL
-  RCURL
-  LSQUARE
-  RSQUARE
-  COMMA
-  SEMICOLON
-  ID
-  STRING
-
-%left 
-%right
-
-%nonassoc 
+/* regular tokens */
+%token <Token> IF ELSE FOR WHILE DO BREAK INT CHAR FLOAT DOUBLE VOID RETURN SWITCH CASE DEFAULT 
+%token <Token> CONTINUE CONST_INT CONST_FLOAT CONST_CHAR ADDOP MULOP INCOP DECOP RELOP ASSIGNOP LOGICOP 
+%token <Token> BITOP NOT LPAREN RPAREN LCURL RCURL LSQUARE RSQUARE COMMA SEMICOLON ID STRING MULTI_LINE_STRING
 
 
 %%
@@ -105,9 +70,9 @@ type_specifier	: INT
  		;
  		
 declaration_list : declaration_list COMMA ID
- 		  | declaration_list COMMA ID LTHIRD CONST_INT RTHIRD
+ 		  | declaration_list COMMA ID LSQUARE CONST_INT RSQUARE
  		  | ID
- 		  | ID LTHIRD CONST_INT RTHIRD
+ 		  | ID LSQUARE CONST_INT RSQUARE
  		  ;
  		  
 statements : statement
@@ -121,7 +86,7 @@ statement : var_declaration
 	  | IF LPAREN expression RPAREN statement
 	  | IF LPAREN expression RPAREN statement ELSE statement
 	  | WHILE LPAREN expression RPAREN statement
-	  | PRINTLN LPAREN ID RPAREN SEMICOLON
+	  /* | PRINTLN LPAREN ID RPAREN SEMICOLON */
 	  | RETURN expression SEMICOLON
 	  ;
 	  
@@ -130,7 +95,7 @@ expression_statement 	: SEMICOLON
 			;
 	  
 variable : ID 		
-	 | ID LTHIRD expression RTHIRD 
+	 | ID LSQUARE expression RSQUARE 
 	 ;
 	 
  expression : logic_expression	
@@ -178,7 +143,7 @@ arguments : arguments COMMA logic_expression
 
 %%
 
-void yyerror(YYLTYPE* locp, const char *s, ...) {
+void yyerror(YYLTYPE* locp, ParserContext* context, const char *s, ...) {
   va_list ap;
   va_start(ap, s);
   if(t.first_line) {
