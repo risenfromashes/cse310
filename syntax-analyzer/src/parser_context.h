@@ -1,5 +1,6 @@
 #pragma once
 
+#include "type_table.h"
 #include <parse_utils.h>
 #include <string>
 #include <string_view>
@@ -43,13 +44,16 @@ private:
 
   std::string buf_;
   int error_count_;
-  SymbolTable table_;
   // location info
   int start_line_ = 1;
   int start_col_ = 1;
   int column_ = 1;
 
   void *scanner_;
-
   FILE *in_file_;
+
+  /* symbol table */
+  SymbolTable table_;
+  /* type table, types need to live for the entire compilation */
+  TypeTable type_table_;
 };
