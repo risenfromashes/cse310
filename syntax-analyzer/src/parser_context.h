@@ -1,6 +1,6 @@
 #pragma once
 
-#include "type_table.h"
+#include "ast/type.h"
 #include <parse_utils.h>
 #include <string>
 #include <string_view>
@@ -9,6 +9,9 @@
 
 class ParserContext {
 public:
+  /* word size */
+  int word_size = 16;
+
   ParserContext(FILE *input);
   ~ParserContext();
 
@@ -36,7 +39,11 @@ public:
 
   void handle_id(const char *lexeme);
 
-  void finish(int line);
+  void finish();
+
+  Type *get_base_type(Token *token);
+
+  Type *get_built_in_type(BuiltInTypeName type);
 
 private:
   void init_scanner();
@@ -54,6 +61,7 @@ private:
 
   /* symbol table */
   SymbolTable table_;
-  /* type table, types need to live for the entire compilation */
-  TypeTable type_table_;
+
+  /* built in types */
+  std::unique_ptr<BuiltInType> built_in_types_[BUILT_IN_TYPE_COUNT];
 };

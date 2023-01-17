@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <optional>
 #include <string>
 
@@ -7,8 +8,7 @@
 const int COMMENT = 1023;
 const int MULTI_LINE_COMMENT = 1022;
 
-class Token
-{
+class Token {
 public:
   using Type = int;
 
@@ -19,8 +19,7 @@ public:
   Type type() const { return type_; }
 
   std::optional<std::string_view> value() { return value_; }
-  std::string move_value()
-  {
+  std::string move_value() {
     assert(value_);
     return std::move(value_.value());
   }
@@ -32,7 +31,6 @@ private:
   std::optional<std::string> value_;
 };
 
-inline bool is_comment(Token::Type type)
-{
+inline bool is_comment(Token::Type type) {
   return type == COMMENT || type == MULTI_LINE_COMMENT;
 }

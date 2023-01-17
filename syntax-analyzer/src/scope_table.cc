@@ -42,11 +42,11 @@ ScopeTable::find_helper(std::string_view name) {
 }
 
 /* Use find helper to avoid recomputing hash */
-bool ScopeTable::insert(std::string_view name, std::string_view type) {
+bool ScopeTable::insert(std::string_view name, SymbolType type, Decl *decl) {
   auto [h, i, prev, curr] = find_helper(name);
   if (!curr) {
     auto *new_node = symbol_allocator_.allocate(1);
-    std::construct_at(new_node, name, type);
+    std::construct_at(new_node, name, type, decl);
 
     if (prev) {
       prev->set_next(new_node);

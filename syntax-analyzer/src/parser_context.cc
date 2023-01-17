@@ -1,4 +1,7 @@
 #include "parser_context.h"
+#include "ast/decl.h"
+#include "ast/type.h"
+#include "symbol_info.h"
 #include "token.h"
 
 #include <parser.tab.h>
@@ -8,7 +11,7 @@ ParserContext::ParserContext(FILE *input)
   init_scanner();
 }
 
-ParserContext::~ParserContext() { finish_scanner(); }
+ParserContext::~ParserContext() { finish(); }
 
 Token *ParserContext::new_token(int lineno, const char *text,
                                 Token::Type type) {
@@ -52,12 +55,12 @@ void ParserContext::enter_scope() { table_.enter_scope(); }
 void ParserContext::exit_scope() { table_.exit_scope(); }
 
 void ParserContext::handle_id(const char *lexeme) {
-  if (!table_.look_up(lexeme)) {
-    table_.insert(lexeme, "ID");
-    table_.log_all_scopes();
-  } else {
-    Log::write("\t{} already exisits in the current ScopeTable\n", lexeme);
-  }
+  // if (!table_.look_up(lexeme)) {
+  //   table_.insert(lexeme, "ID");
+  //   table_.log_all_scopes();
+  // } else {
+  //   Log::write("\t{} already exisits in the current ScopeTable\n", lexeme);
+  // }
 }
 
 void ParserContext::report_error(int lineno, const char *text,
@@ -79,8 +82,53 @@ void ParserContext::report_error(int lineno, const char *text,
 
 void ParserContext::append_buf(std::string_view str) { buf_.append(str); }
 
-void ParserContext::finish(int line) {
-  table_.log_all_scopes();
-  Log::write("Total lines: {}\n", line);
-  Log::write("Total errors: {}\n", error_count_);
+void ParserContext::finish() { finish_scanner(); }
+
+Type *ParserContext::get_base_type(Token *token) {
+  BuiltInTypeName built_in;
+  switch (token->type()) {
+  case VOID:
+    built_in = BuiltInTypeName::VOID;
+    break;
+  case INT:
+    built_in = BuiltInTypeName::INT;
+    break;
+  case FLOAT:
+    built_in = BuiltInTypeName::FLOAT;
+    break;
+  case CHAR:
+    built_in = BuiltInTypeName::CHAR;
+    break;
+  case DOUBLE:
+    built_in = BuiltInTypeName::DOUBLE;
+    break;
+  case ID: {
+    auto symbol = table_.look_up(*token->value());
+
+    if (symbol->type() == SymbolType::TYPE) {
+      auto type = dynamic_cast<Type *>(symbol->decl());
+
+      return type;
+    }
+
+    break;
+  }
+
+  default:
+    return nullptr;
+  }
+
+  /* built in type found */
+
+  return get_built_in_type(built_in);
+}
+
+Type *ParserContext::get_built_in_type(BuiltInTypeName built_in) {
+  int idx = (int)built_in;
+  if (!built_in_types_[idx]) {
+    /* construct if null */
+    built_in_types_[idx] = std::make_unique<BuiltInType>(built_in);
+  }
+
+  return built_in_types_[idx].get();
 }

@@ -36,9 +36,9 @@ void SymbolTable::exit_scope() {
   allocator_.deallocate(t, 1);
 }
 
-bool SymbolTable::insert(std::string_view name, std::string_view type) {
+bool SymbolTable::insert(std::string_view name, SymbolType type, Decl *decl) {
   assert(current_scope_);
-  bool inserted = current_scope_->insert(name, type);
+  bool inserted = current_scope_->insert(name, type, decl);
   if (!inserted) {
     // Log::writeln("\t'{}' already exists in the current ScopeTable", name);
   }

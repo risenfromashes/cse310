@@ -15,7 +15,7 @@ public:
   void exit_scope();
 
   /* insert symbol into current scope */
-  bool insert(std::string_view name, std::string_view type);
+  bool insert(std::string_view name, SymbolType type, Decl *decl);
 
   /* delete symbol into current scope */
   bool remove(std::string_view name);

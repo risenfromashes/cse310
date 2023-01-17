@@ -2,6 +2,7 @@
 #include <cassert>
 #include <tuple>
 
+#include "ast/ast_visitor.h"
 #include "sdbm_hash.h"
 #include "symbol_info.h"
 
@@ -31,7 +32,7 @@ private:
 
 public:
   /* Insert symbol into table */
-  bool insert(std::string_view name, std::string_view type);
+  bool insert(std::string_view name, SymbolType type, Decl *decl);
 
   /* Lookup symbol in the table */
   SymbolInfo *look_up(std::string_view name);
