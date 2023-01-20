@@ -1,6 +1,7 @@
 #include "parser_context.h"
 #include "ast/decl.h"
 #include "ast/type.h"
+#include "parse_utils.h"
 #include "symbol_info.h"
 #include "token.h"
 
@@ -43,8 +44,8 @@ Token *ParserContext::new_token(int lineno, const char *text,
   }
 
   Token *token = new Token(type, std::move(val));
-  Log::write("Line# {}: Token <{}> Lexeme {} found\n", line, token->type_str(),
-             lexeme);
+  logger_.write("Line# {}: Token <{}> Lexeme {} found\n", line,
+                token->type_str(), lexeme);
 
   buf_.clear();
   return token;
@@ -75,7 +76,7 @@ void ParserContext::report_error(int lineno, const char *text,
   if (std::strcmp(error_type, "UNFINISHED_COMMENT") == 0) {
     lexeme = buf_;
   }
-  Log::write("Error at line# {}: {} {}\n", line, error_type, lexeme);
+  error_logger_.write("Error at line# {}: {} {}\n", line, error_type, lexeme);
   error_count_++;
   buf_.clear();
 }
@@ -131,4 +132,12 @@ Type *ParserContext::get_built_in_type(BuiltInTypeName built_in) {
   }
 
   return built_in_types_[idx].get();
+}
+
+Decl *ParserContext::lookup_decl(std::string_view name) {
+  auto symbol = table_.look_up(name);
+  if (symbol) {
+    return symbol->decl();
+  }
+  return nullptr;
 }

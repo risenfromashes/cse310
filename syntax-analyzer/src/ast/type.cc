@@ -38,9 +38,12 @@ Type *Type::qual_type(TypeQualifier qual) {
 }
 
 Type *Type::decay_type() {
-  assert(is_array());
   assert(base_type());
-  return base_type()->pointer_type();
+  if (is_array()) {
+    return base_type()->pointer_type();
+  } else if (is_function()) {
+    return pointer_type();
+  }
 }
 
 QualType::QualType(Type *base_type, TypeQualifier qual)
@@ -132,11 +135,45 @@ size_t BuiltInType::size() {
     return EnvConsts::float_size;
   case BuiltInTypeName::FLOAT:
     return EnvConsts::float_size;
+  case BuiltInTypeName::DOUBLE:
+    return EnvConsts::float_size * 2;
   case BuiltInTypeName::VOID:
     return 0;
   }
 }
 
+Type *PointerType::remove_pointer() { return base_type(); }
+
 bool QualType::is_pointer() { return base_type()->is_pointer(); }
+
+Type *QualType::remove_pointer() { return base_type()->pointer_type(); }
+
 bool QualType::is_const() { return qual_ == TypeQualifier::CONST; }
+
 size_t QualType::size() { return base_type()->size(); }
+
+bool BuiltInType::is_void() { return type_name_ == BuiltInTypeName::VOID; }
+
+FuncType::FuncType(Type *ret_type, std::vector<Type *> param_types)
+    : return_type_(ret_type), param_types_(std::move(param_types)) {}
+
+std::string_view to_string(CastKind kind) {
+  switch (kind) {
+  case CastKind::LVALUE_TO_RVALUE:
+    return "LVALUE_TO_RVALUE";
+  case CastKind::ARRAY_TO_POINTER:
+    return "ARRAY_TO_POINTER";
+  case CastKind::INTEGRAL_CAST:
+    return "INTEGRAL_CAST";
+  case CastKind::INTEGRAL_TO_FLOATING:
+    return "INTEGRAL_TO_FLOATING";
+  case CastKind::FLOATING_TO_INTEGRAL:
+    return "FLOATING_TO_INTEGRAL";
+  case CastKind::ARRAY_PTR_TO_PTR:
+    return "ARRAY_PTR_TO_PTR";
+  case CastKind::FUNCTION_TO_PTR:
+    return "FUNCTION_TO_PTR";
+  case CastKind::POINTER_CAST:
+    return "POINTER_CAS";
+  }
+}

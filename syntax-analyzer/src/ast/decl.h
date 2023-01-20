@@ -8,8 +8,13 @@
 
 class Decl : public ASTNode {
 public:
-  Decl(Location loc);
+  Decl(Location loc, Type *type);
   virtual ~Decl() = default;
+
+  Type *type() { return type_; }
+
+private:
+  Type *type_;
 };
 
 class VarDecl : public Decl {
@@ -18,11 +23,9 @@ public:
 
   void visit(ASTVisitor *visitor) override;
 
-  Type *type() { return type_.get(); }
   std::string_view name() { return name_; }
 
 private:
-  std::unique_ptr<Type> type_;
   std::string name_;
 };
 
@@ -30,15 +33,13 @@ using VarDecls = std::unique_ptr<std::vector<std::unique_ptr<VarDecl>>>;
 
 class ParamDecl : public Decl {
 public:
-  ParamDecl(Location loc, Type *type, std::string name);
+  ParamDecl(Location loc, std::string name);
 
   void visit(ASTVisitor *visitor) override;
 
-  Type *type() { return type_.get(); }
   std::string_view name() { return name_; }
 
 private:
-  std::unique_ptr<Type> type_;
   std::string name_;
 };
 
@@ -52,7 +53,8 @@ public:
   void visit(ASTVisitor *visitor) override;
 
   Type *return_type() { return return_type_; }
-  std::vector<std::unique_ptr<ParamDecl>> &params() { return *params_; }
+  const std::vector<std::unique_ptr<ParamDecl>> &params() { return *params_; }
+
   std::string_view name() { return name_; }
 
 private:

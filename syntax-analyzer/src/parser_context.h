@@ -51,6 +51,8 @@ public:
 
   Type *get_built_in_type(BuiltInTypeName type);
 
+  Decl *lookup_decl(std::string_view name);
+
 private:
   void init_scanner();
   void finish_scanner();

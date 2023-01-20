@@ -1,5 +1,6 @@
 #include "ast/expr.h"
 #include "ast/cast.h"
+#include "ast/decl.h"
 #include "ast/type.h"
 
 #include <cassert>
@@ -8,6 +9,16 @@
 
 Expr::Expr(Location loc, Type *type, ValueType value_type)
     : ASTNode(loc), type_(type), value_type_(value_type) {}
+
+Expr *Expr::decay() {
+  CastKind cast_kind;
+  if (type()->is_array()) {
+    cast_kind = CastKind::ARRAY_TO_POINTER;
+  } else if (type()->is_function()) {
+    cast_kind = CastKind::FUNCTION_TO_PTR;
+  }
+  return new ImplicitCastExpr(loc_, this, type()->decay_type(), cast_kind);
+}
 
 ImplicitCastExpr *Expr::implicit_cast(Type *to, CastKind cast_kind) {
   return new ImplicitCastExpr(loc_, this, to, cast_kind);
@@ -34,6 +45,14 @@ void RecoveryExpr::add_children(std::initializer_list<ASTNode *> nodes) {
   }
 }
 
+void RecoveryExpr::add_child(ASTNode *node) {
+  children_.push_back(std::unique_ptr<ASTNode>(node));
+}
+
+void RecoveryExpr::add_child(std::unique_ptr<ASTNode> node) {
+  children_.push_back(std::move(node));
+}
+
 UnaryExpr::UnaryExpr(ParserContext *context, Location loc, UnaryOp op,
                      Expr *operand)
     : Expr(loc, determine_type(context), determine_value_type()), op_(op),
@@ -49,6 +68,11 @@ Expr *UnaryExpr::create(ParserContext *context, Location loc, UnaryOp op,
     ret->add_children({_operand});
     return ret;
   }
+
+  if (op != UnaryOp::ADDRESS) {
+    operand = operand->decay();
+  }
+
   bool valid = false;
   switch (op) {
   case UnaryOp::PLUS:
@@ -116,12 +140,55 @@ BinaryExpr::BinaryExpr(ParserContext *context, Location loc, BinaryOp op,
     : Expr(loc, determine_type(context), determine_value_type()), op_(op),
       loperand_(l), roperand_(r) {}
 
+/* get the larger (more precise) of two arithmetic expression types to upcast to
+ */
+static void arithmetic_upcast(Expr *&l, Expr *&r) {
+  Type *lt = l->type();
+  Type *rt = r->type();
+  Type *u;
+
+  if (lt->is_floating()) {
+    if (rt->is_floating()) {
+      /* get wider type */
+      if (lt->size() >= rt->size()) {
+        u = lt;
+      } else {
+        u = rt;
+      }
+    } else {
+      u = lt;
+    }
+  } else if (rt->is_floating()) {
+    /* l is not floating */
+    u = rt;
+  } else {
+    /* get wider type */
+    if (lt->size() >= rt->size()) {
+      u = lt;
+    } else {
+      u = rt;
+    }
+  }
+  /* only cast if needed */
+  if (u == lt) {
+    if (u != rt) {
+      auto cast = rt->convertible_to(lt);
+      r = r->implicit_cast(lt, *cast);
+    }
+  } else {
+    if (u != lt) {
+      auto cast = lt->convertible_to(rt);
+      l = l->implicit_cast(rt, *cast);
+    }
+  }
+}
+
 Expr *BinaryExpr::create(ParserContext *context, Location loc, BinaryOp op,
                          ASTNode *_loperand, ASTNode *_roperand) {
-  auto loperand = dynamic_cast<Expr *>(_loperand);
-  auto roperand = dynamic_cast<Expr *>(_loperand);
+  auto l = dynamic_cast<Expr *>(_loperand);
+  auto r = dynamic_cast<Expr *>(_roperand);
 
-  if (!loperand || !roperand) {
+  if (!l || !r) {
     context->report_error(loc, "Operand of operator '{}' is not an expression",
                           to_string(op));
     auto ret = new RecoveryExpr(loc);
@@ -131,50 +198,115 @@ Expr *BinaryExpr::create(ParserContext *context, Location loc, BinaryOp op,
 
   bool valid = false;
   if (op == BinaryOp::ASSIGN) {
-    if (loperand->value_type() == ValueType::LVALUE &&
-        !loperand->type()->is_const()) {
-      if (roperand->value_type() != ValueType::RVALUE) {
-        roperand = roperand->to_rvalue();
+    if (l->value_type() == ValueType::LVALUE && !l->type()->is_const()) {
+      r = r->decay();
+      if (r->value_type() != ValueType::RVALUE) {
+        r = r->to_rvalue();
       }
-      if (roperand->type() == loperand->type()) {
+      if (r->type() == l->type()) {
         valid = true;
       } else {
-        auto cast = roperand->type()->convertible_to(loperand->type());
+        auto cast = r->type()->convertible_to(l->type());
         if (cast) {
-          roperand = roperand->implicit_cast(loperand->type(), *cast);
+          r = r->implicit_cast(l->type(), *cast);
           valid = true;
         }
       }
     }
   } else {
-    if (loperand->value_type() != ValueType::RVALUE) {
-      loperand = loperand->to_rvalue();
+    l = l->decay();
+    r = r->decay();
+
+    if (l->value_type() != ValueType::RVALUE) {
+      l = l->to_rvalue();
     }
-    if (roperand->value_type() != ValueType::RVALUE) {
-      roperand = roperand->to_rvalue();
+    if (r->value_type() != ValueType::RVALUE) {
+      r = r->to_rvalue();
     }
     switch (op) {
     case BinaryOp::ASSIGN:
       break;
     case BinaryOp::ADD: {
-      if (loperand->type()->is_pointer() && roperand->type()->is_pointer()) {
+      if ((l->type()->is_pointer() && r->type()->is_integral()) ||
+          (r->type()->is_pointer() && l->type()->is_integral())) {
+        // pointer arithmetic
+        valid = true;
+      }
+      if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
+        arithmetic_upcast(l, r);
+        valid = true;
       }
     } break;
     case BinaryOp::SUB:
+      if (l->type()->is_pointer() && r->type()->is_integral()) {
+        // pointer arithmetic
+        valid = true;
+      }
+      if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
+        arithmetic_upcast(l, r);
+        valid = true;
+      }
       break;
     case BinaryOp::MUL:
     case BinaryOp::DIV:
+      if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
+        arithmetic_upcast(l, r);
+        valid = true;
+      }
+      break;
     case BinaryOp::BIT_AND:
     case BinaryOp::BIT_OR:
     case BinaryOp::BIT_XOR:
+      if (l->type()->is_integral() && r->type()->is_integral()) {
+        arithmetic_upcast(l, r);
+        valid = true;
+      }
       break;
     case BinaryOp::BIT_LEFT_SHIFT:
     case BinaryOp::BIT_RIGHT_SHIFT:
+      if (l->type()->is_integral() && r->type()->is_integral()) {
+        /* no need to upcast */
+        valid = true;
+      }
       break;
     case BinaryOp::LOGIC_EQUALS:
     case BinaryOp::LOGIC_NOT_EQUALS:
+      if (l->type()->is_pointer() && r->type()->is_pointer()) {
+        auto lb = l->type()->base_type()->remove_qualifier();
+        auto rb = r->type()->base_type()->remove_qualifier();
+        if (lb == rb) {
+          valid = true;
+          if (l->type() != r->type()) {
+            r->implicit_cast(l->type(), CastKind::POINTER_CAST);
+          }
+        } else if (lb->is_void() || rb->is_void()) {
+          valid = true;
+          if (l->type() != r->type()) {
+            r->implicit_cast(l->type(), CastKind::POINTER_CAST);
+          }
+        }
+      }
+      if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
+        arithmetic_upcast(l, r);
+        valid = true;
+      }
     case BinaryOp::LOGIC_AND:
     case BinaryOp::LOGIC_OR:
+      if (l->type()->is_pointer() && r->type()->is_pointer()) {
+        // compare base type
+        auto lb = l->type()->base_type()->remove_qualifier();
+        auto rb = r->type()->base_type()->remove_qualifier();
+        if (lb == rb) {
+          if (l->type() != r->type()) {
+            r->implicit_cast(l->type(), CastKind::POINTER_CAST);
+          }
+          valid = true;
+        }
+      }
+      if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
+        arithmetic_upcast(l, r);
+        valid = true;
+      }
       break;
     }
   }
@@ -182,19 +314,20 @@ Expr *BinaryExpr::create(ParserContext *context, Location loc, BinaryOp op,
   if (!valid) {
     if (op == BinaryOp::ASSIGN) {
       context->report_error(loc, "Cannot assign {} of type {} to {}",
-                            to_string(op), to_string(loperand->value_type()),
-                            loperand->type()->name(), roperand->type()->name());
+                            to_string(op), to_string(l->value_type()),
+                            l->type()->name(), r->type()->name());
     } else {
       context->report_error(
-          loc, "Invalid use of operator '{}' on types {} and types {}",
-          to_string(op), loperand->type()->name(), roperand->type()->name());
+          loc, "Invalid use of operator '{}' on type {} and type {}",
+          to_string(op), l->type()->name(), r->type()->name());
     }
+
     auto ret = new RecoveryExpr(loc);
     ret->add_children({_loperand, _roperand});
     return ret;
   }
 
-  return new BinaryExpr(context, loc, op, loperand, roperand);
+  return new BinaryExpr(context, loc, op, l, r);
 }
 
 Type *BinaryExpr::determine_type(ParserContext *context) {
@@ -212,6 +345,134 @@ Type *BinaryExpr::determine_type(ParserContext *context) {
 }
 
 ValueType BinaryExpr::determine_value_type() { return ValueType::RVALUE; }
+
+RefExpr::RefExpr(ParserContext *context, Location loc, Decl *decl)
+    : Expr(loc, determine_type(context), determine_value_type()), decl_(decl) {}
+
+Expr *RefExpr::create(ParserContext *context, Location loc, Token *token) {
+  if (!token->value()) {
+    context->report_error(loc, "Identifier without value");
+    auto ret = new RecoveryExpr(loc);
+    return ret;
+  }
+  std::string_view name = *token->value();
+  Decl *decl = context->lookup_decl(name);
+  if (!decl) {
+    context->report_error(loc, "Use of undeclared identifier '{}'", name);
+    auto ret = new RecoveryExpr(loc);
+    return ret;
+  }
+
+  return new RefExpr(context, loc, decl);
+}
+
+Type *RefExpr::determine_type(ParserContext *context) { return decl()->type(); }
+
+ValueType RefExpr::determine_value_type() {
+  if (decl()->type()->is_array()) {
+    return ValueType::RVALUE;
+  } else {
+    return ValueType::LVALUE;
+  }
+}
+
+CallExpr::CallExpr(ParserContext *context, Location loc, Expr *callee,
+                   FuncType *func_type,
+                   std::vector<std::unique_ptr<Expr>> arguments)
+    : Expr(loc, determine_type(context), determine_value_type()),
+      callee_(callee), func_type_(func_type), arguments_(std::move(arguments)) {
+}
+
+Expr *callexpr_error(Location loc, ASTNode *_callee,
+                     std::vector<ASTNode *> *arguments) {
+  auto ret = new RecoveryExpr(loc);
+  ret->add_child(_callee);
+  for (auto &arg : *arguments) {
+    ret->add_child(std::move(arg));
+  }
+  return ret;
+}
+
+Expr *CallExpr::create(ParserContext *context, Location loc, ASTNode *_callee,
+                       std::vector<ASTNode *> *_args) {
+
+  Expr *c = dynamic_cast<Expr *>(_callee);
+  if (!c) {
+    context->report_error(loc, "Callee is not an expression");
+    return callexpr_error(loc, _callee, _args);
+  }
+
+  c = c->decay();
+  if (c->value_type() != ValueType::RVALUE) {
+    c = c->to_rvalue();
+  }
+
+  bool valid = false;
+  FuncType *type;
+
+  if (c->type()->is_function()) {
+    // i guess this is impossible?
+    valid = true;
+    type = dynamic_cast<FuncType *>(c->type());
+
+  } else if (c->type()->is_pointer()) {
+    valid = c->type()->remove_pointer()->is_function();
+    type = dynamic_cast<FuncType *>(c->type()->remove_pointer());
+  }
+
+  std::vector<std::unique_ptr<Expr>> args;
+
+  if (!valid) {
+    context->report_error(loc, "Expression is not callable");
+    return callexpr_error(loc, _callee, _args);
+  }
+
+  if (_args->size() != type->param_types().size()) {
+    context->report_error(loc, "Argument size doesn't match function type");
+    return callexpr_error(loc, _callee, _args);
+  } else {
+    auto n = _args->size();
+    for (size_t i = 0; i < n; i++) {
+
+      auto _arg = (*_args)[i];
+      auto arg = dynamic_cast<Expr *>(_arg);
+      auto param_t = type->param_types()[i];
+
+      if (!arg) {
+        context->report_error(loc, "Argument {} is not an expression", i + 1);
+        return callexpr_error(loc, _callee, _args);
+      }
+
+      arg = arg->decay();
+      if (arg->value_type() == ValueType::LVALUE) {
+        arg = arg->to_rvalue();
+      }
+
+      if (arg->type() == param_t) {
+        continue;
+      }
+
+      auto cast = arg->type()->convertible_to(param_t);
+      if (cast) {
+        arg = arg->implicit_cast(param_t, *cast);
+        continue;
+      }
+
+      context->report_error(
+          loc, "Argument {} doesn't match parameter type ({} vs {})", i + 1,
+          arg->type()->name(), param_t->name());
+      return callexpr_error(loc, _callee, _args);
+    }
+  }
+
+  return new CallExpr(context, loc, c, type, std::move(args));
+}
+
+Type *CallExpr::determine_type(ParserContext *context) {
+  return func_type()->return_type();
+}
+
+ValueType CallExpr::determine_value_type() { return ValueType::RVALUE; }
 
 std::string_view to_string(UnaryOp op) {
   switch (op) {

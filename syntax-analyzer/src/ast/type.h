@@ -1,8 +1,8 @@
 #pragma once
 
-#include "ast/cast.h"
-#include "ast/expr.h"
-
+#include <memory>
+#include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -11,8 +11,21 @@ constexpr int TYPE_QUALIFIER_COUNT = 2;
 
 std::string_view to_string(TypeQualifier qual);
 
-enum class BuiltInTypeName : int { VOID = 0, INT, FLOAT, CHAR };
+enum class BuiltInTypeName : int { VOID = 0, INT, FLOAT, CHAR, DOUBLE };
 constexpr int BUILT_IN_TYPE_COUNT = 4;
+
+enum class CastKind {
+  LVALUE_TO_RVALUE,
+  ARRAY_TO_POINTER,
+  INTEGRAL_CAST,
+  INTEGRAL_TO_FLOATING,
+  FLOATING_TO_INTEGRAL,
+  ARRAY_PTR_TO_PTR,
+  FUNCTION_TO_PTR,
+  POINTER_CAST
+};
+
+std::string_view to_string(CastKind kind);
 
 struct EnvConsts {
 public:
@@ -48,16 +61,21 @@ public:
   /* meta data */
 
   bool is_arithmetic() { return is_integral() || is_floating(); }
+
+  virtual bool is_void() { return false; }
   virtual bool is_integral() { return false; }
   virtual bool is_floating() { return false; }
   virtual bool is_signed() { return false; }
   virtual bool is_struct() { return false; }
   virtual bool is_union() { return false; }
   virtual size_t size() { return 0; }
-
+  virtual bool is_function() { return false; }
   virtual bool is_array() { return false; }
   virtual bool is_pointer() { return false; }
   virtual bool is_const() { return false; }
+
+  virtual Type *remove_pointer() { return this; }
+  virtual Type *remove_qualifier() { return this; }
 
   std::string_view name() { return name_; }
 
@@ -82,9 +100,12 @@ public:
   TypeQualifier qualifier() { return qual_; }
 
   std::optional<CastKind> convertible_to(Type *to) override;
+  Type *remove_pointer() override;
   bool is_pointer() override;
   bool is_const() override;
   size_t size() override;
+
+  Type *remove_qualifier() override { return base_type(); }
 
 private:
   TypeQualifier qual_;
@@ -96,6 +117,8 @@ public:
 
   bool is_pointer() override { return true; }
   size_t size() override { return EnvConsts::pointer_size; }
+
+  Type *remove_pointer() override;
 
   std::optional<CastKind> convertible_to(Type *to) override;
 };
@@ -132,6 +155,7 @@ class BuiltInType : public Type {
 public:
   BuiltInType(BuiltInTypeName type);
 
+  bool is_void() override;
   bool is_integral() override;
   bool is_floating() override;
   bool is_signed() override;
@@ -141,4 +165,18 @@ public:
 
 private:
   BuiltInTypeName type_name_;
+};
+
+class FuncType : public Type {
+public:
+  FuncType(Type *ret_type, std::vector<Type *> arg_types);
+
+  bool is_function() { return true; }
+  Type *return_type() { return return_type_; }
+
+  const std::vector<Type *> &param_types() { return param_types_; }
+
+private:
+  Type *return_type_;
+  std::vector<Type *> param_types_;
 };

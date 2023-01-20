@@ -2,12 +2,14 @@
 
 #include "ast/ast_node.h"
 #include "ast/ast_visitor.h"
+#include "ast/type.h"
 
 #include <concepts>
 #include <memory>
 #include <optional>
 #include <vector>
 
+class Token;
 class ParserContext;
 
 enum class ValueType { LVALUE, RVALUE };
@@ -44,14 +46,8 @@ enum class BinaryOp {
   LOGIC_OR,
 };
 
-enum class CastKind {
-  LVALUE_TO_RVALUE,
-  ARRAY_TO_POINTER,
-  INTEGRAL_CAST,
-  INTEGRAL_TO_FLOATING,
-  FLOATING_TO_INTEGRAL,
-  ARRAY_PTR_TO_PTR
-};
+std::string_view to_string(UnaryOp op);
+std::string_view to_string(BinaryOp op);
 
 class ImplicitCastExpr;
 
@@ -63,6 +59,7 @@ public:
   Type *type();
   ValueType value_type();
 
+  Expr *decay();
   ImplicitCastExpr *implicit_cast(Type *to, CastKind cast_kind);
   ImplicitCastExpr *to_rvalue();
 
@@ -76,6 +73,8 @@ class RecoveryExpr : public Expr {
 public:
   RecoveryExpr(Location loc);
   void add_children(std::initializer_list<ASTNode *> nodes);
+  void add_child(ASTNode *node);
+  void add_child(std::unique_ptr<ASTNode> node);
 
 private:
   Type *determine_type(ParserContext *context) { return nullptr; }
@@ -132,6 +131,8 @@ class RefExpr : public Expr {
 public:
   RefExpr(ParserContext *context, Location loc, Decl *decl);
 
+  static Expr *create(ParserContext *context, Location loc, Token *id);
+
   Decl *decl() { return decl_; }
 
   void visit(ASTVisitor *visitor) override;
@@ -145,21 +146,26 @@ private:
 
 class CallExpr : public Expr {
 public:
-  CallExpr(ParserContext *context, Location loc, Decl *decl,
-           std::vector<std::unique_ptr<Expr>> *arguments);
+  CallExpr(ParserContext *context, Location loc, Expr *callee,
+           FuncType *func_type, std::vector<std::unique_ptr<Expr>> arguments);
+
+  static Expr *create(ParserContext *context, Location loc, ASTNode *callee,
+                      std::vector<ASTNode *> *arguments);
 
   void visit(ASTVisitor *visitor) override;
 
-  Decl *declaration() { return decl_; }
+  Expr *callee() { return callee_.get(); }
+  FuncType *func_type() { return func_type_; }
 
-  std::vector<std::unique_ptr<Expr>> &arguments() { return *arguments_; }
+  const std::vector<std::unique_ptr<Expr>> &arguments() { return arguments_; }
 
 private:
   Type *determine_type(ParserContext *context);
   ValueType determine_value_type();
 
-  Decl *decl_;
-  std::unique_ptr<std::vector<std::unique_ptr<Expr>>> arguments_;
+  FuncType *func_type_;
+  std::unique_ptr<Expr> callee_;
+  std::vector<std::unique_ptr<Expr>> arguments_;
 };
 
 class ArraySubscriptExpr : public Expr {
@@ -176,6 +182,3 @@ private:
   RefExpr *ref_;
   Expr *subscript_;
 };
-
-std::string_view to_string(UnaryOp op);
-std::string_view to_string(BinaryOp op);
