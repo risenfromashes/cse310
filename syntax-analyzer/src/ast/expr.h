@@ -3,6 +3,7 @@
 #include "ast/ast_node.h"
 #include "ast/ast_visitor.h"
 
+#include <concepts>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -11,37 +12,84 @@ class ParserContext;
 
 enum class ValueType { LVALUE, RVALUE };
 
+std::string_view to_string(ValueType);
+
+enum class UnaryOp {
+  PLUS,
+  MINUS,
+  BIT_NEGATE,
+  LOGIC_NOT,
+  PRE_INC,
+  PRE_DEC,
+  POST_INC,
+  POST_DEC,
+  POINTER_DEREF,
+  ADDRESS,
+};
+
+enum class BinaryOp {
+  ASSIGN,
+  ADD,
+  SUB,
+  MUL,
+  DIV,
+  BIT_AND,
+  BIT_OR,
+  BIT_XOR,
+  BIT_LEFT_SHIFT,
+  BIT_RIGHT_SHIFT,
+  LOGIC_EQUALS,
+  LOGIC_NOT_EQUALS,
+  LOGIC_AND,
+  LOGIC_OR,
+};
+
+enum class CastKind {
+  LVALUE_TO_RVALUE,
+  ARRAY_TO_POINTER,
+  INTEGRAL_CAST,
+  INTEGRAL_TO_FLOATING,
+  FLOATING_TO_INTEGRAL,
+  ARRAY_PTR_TO_PTR
+};
+
+class ImplicitCastExpr;
+
 class Expr : public ASTNode {
 public:
-  Expr(Location loc);
+  Expr(Location loc, Type *type, ValueType value_type);
   virtual ~Expr() = default;
 
   Type *type();
   ValueType value_type();
 
-protected:
-  virtual Type *determine_type(ParserContext *context) = 0;
-  virtual ValueType determine_value_type() = 0;
+  ImplicitCastExpr *implicit_cast(Type *to, CastKind cast_kind);
+  ImplicitCastExpr *to_rvalue();
 
+protected:
   Type *type_;
-  std::optional<ValueType> value_type_;
+  ValueType value_type_;
+};
+
+/* Error Recovery Expr */
+class RecoveryExpr : public Expr {
+public:
+  RecoveryExpr(Location loc);
+  void add_children(std::initializer_list<ASTNode *> nodes);
+
+private:
+  Type *determine_type(ParserContext *context) { return nullptr; }
+  ValueType determine_value_type() { return ValueType::RVALUE; }
+
+  std::vector<std::unique_ptr<ASTNode>> children_;
 };
 
 class UnaryExpr : public Expr {
 public:
-  enum class UnaryOp {
-    MINUS,
-    BIT_NEGATE,
-    LOGIC_NOT,
-    POINTER_DEREF,
-    ADDRESS,
-    PRE_INC,
-    PRE_DEC,
-    POST_INC,
-    POST_DEC,
-  };
-
   UnaryExpr(ParserContext *context, Location loc, UnaryOp op, Expr *operand);
+
+  static Expr *create(ParserContext *context, Location loc, UnaryOp op,
+                      ASTNode *operand);
 
   void visit(ASTVisitor *visitor) override;
 
@@ -49,8 +97,8 @@ public:
   UnaryOp op() { return op_; }
 
 private:
-  Type *determine_type(ParserContext *context) override;
-  ValueType determine_value_type() override;
+  Type *determine_type(ParserContext *context);
+  ValueType determine_value_type();
 
   UnaryOp op_;
   std::unique_ptr<Expr> operand_;
@@ -58,25 +106,11 @@ private:
 
 class BinaryExpr : public Expr {
 public:
-  enum class BinaryOp {
-    ASSIGN,
-    ADD,
-    SUB,
-    MUL,
-    DIV,
-    BIT_AND,
-    BIT_OR,
-    BIT_XOR,
-    BIT_LEFT_SHIFT,
-    BIT_RIGHT_SHIFT,
-    LOGIC_EQUALS,
-    LOGIC_NOT_EQUALS,
-    LOGIC_AND,
-    LOGIC_OR,
-  };
-
   BinaryExpr(ParserContext *context, Location loc, BinaryOp op, Expr *loperand,
              Expr *roperand);
+
+  static Expr *create(ParserContext *context, Location loc, BinaryOp op,
+                      ASTNode *loperand, ASTNode *roperand);
 
   Expr *left_operand() { return loperand_.get(); }
   Expr *right_operand() { return roperand_.get(); }
@@ -85,8 +119,8 @@ public:
   void visit(ASTVisitor *visitor) override;
 
 private:
-  Type *determine_type(ParserContext *context) override;
-  ValueType determine_value_type() override;
+  Type *determine_type(ParserContext *context);
+  ValueType determine_value_type();
 
   BinaryOp op_;
   std::unique_ptr<Expr> loperand_;
@@ -103,8 +137,8 @@ public:
   void visit(ASTVisitor *visitor) override;
 
 private:
-  Type *determine_type(ParserContext *context) override;
-  ValueType determine_value_type() override;
+  Type *determine_type(ParserContext *context);
+  ValueType determine_value_type();
 
   Decl *decl_;
 };
@@ -121,8 +155,8 @@ public:
   std::vector<std::unique_ptr<Expr>> &arguments() { return *arguments_; }
 
 private:
-  Type *determine_type(ParserContext *context) override;
-  ValueType determine_value_type() override;
+  Type *determine_type(ParserContext *context);
+  ValueType determine_value_type();
 
   Decl *decl_;
   std::unique_ptr<std::vector<std::unique_ptr<Expr>>> arguments_;
@@ -136,9 +170,12 @@ public:
   void visit(ASTVisitor *visitor) override;
 
 private:
-  Type *determine_type(ParserContext *context) override;
-  ValueType determine_value_type() override;
+  Type *determine_type(ParserContext *context);
+  ValueType determine_value_type();
 
   RefExpr *ref_;
   Expr *subscript_;
 };
+
+std::string_view to_string(UnaryOp op);
+std::string_view to_string(BinaryOp op);

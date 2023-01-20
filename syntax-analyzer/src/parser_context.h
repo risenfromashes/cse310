@@ -23,6 +23,12 @@ public:
 
   void report_error(int lineno, const char *text, const char *error_type);
 
+  template <class... T>
+  void report_error(Location loc, fmt::format_string<T...> fmt_string,
+                    T &&...args) {
+    error_logger_.writeln(fmt_string, std::forward<decltype(args)>(args)...);
+  }
+
   void enter_scope();
   void exit_scope();
 
@@ -58,6 +64,10 @@ private:
 
   void *scanner_;
   FILE *in_file_;
+
+  /* loggers */
+  Logger error_logger_;
+  Logger logger_;
 
   /* symbol table */
   SymbolTable table_;

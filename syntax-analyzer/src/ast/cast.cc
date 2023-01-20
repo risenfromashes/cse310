@@ -1,18 +1,17 @@
 #include "ast/cast.h"
-
 #include "ast/type.h"
 
 #include <cassert>
 
-ImplicitCastExpr::ImplicitCastExpr(ParserContext *context, Location loc,
-                                   Expr *src_expr, Type *dest_type,
-                                   CastKind kind)
-    : Expr(loc), src_expr_(src_expr), dest_type_(dest_type), cast_kind_(kind) {
-  type_ = determine_type(context);
-  value_type_ = determine_value_type();
+ImplicitCastExpr::ImplicitCastExpr(Location loc, Expr *src_expr,
+                                   Type *dest_type, CastKind kind)
+    : Expr(loc, dest_type, ValueType::RVALUE), src_expr_(src_expr),
+      dest_type_(dest_type), cast_kind_(kind) {
+  type_ = determine_type();
+  value_type_ = ValueType::RVALUE;
 }
 
-Type *ImplicitCastExpr::determine_type(ParserContext *context) {
+Type *ImplicitCastExpr::determine_type() {
   auto type = src_expr_->type();
   switch (cast_kind_) {
   case CastKind::LVALUE_TO_RVALUE: {
@@ -40,7 +39,7 @@ Type *ImplicitCastExpr::determine_type(ParserContext *context) {
 
   default:
     /* do something about integer/float casts */
-    return type;
+    return dest_type_;
   }
 }
 

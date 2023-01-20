@@ -28,13 +28,13 @@ auto expect_params_impl(std::string_view &line, bool matched_before) {
 
 /* Template magic: parse N number of parameters, prints error message otherwise
  */
-template <size_t N>
-auto expect_params(std::string_view &line, std::string_view cmd) {
-  auto ret = expect_params_impl<N>(line, true);
-  if (!std::get<N>(ret)) {
-    Log::writeln("\tNumber of parameters mismatch for the command {}", cmd);
-  }
-  return ret;
-}
+// template <size_t N>
+// auto expect_params(std::string_view &line, std::string_view cmd) {
+//   auto ret = expect_params_impl<N>(line, true);
+//   if (!std::get<N>(ret)) {
+//     Log::writeln("\tNumber of parameters mismatch for the command {}", cmd);
+//   }
+//   return ret;
+// }
 
-std::string unescape_unquote(std::string_view str);
+// std::string unescape_unquote(std::string_view str);
