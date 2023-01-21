@@ -181,6 +181,8 @@ std::string_view to_string(CastKind kind) {
     return "ARRAY_TO_POINTER";
   case CastKind::INTEGRAL_CAST:
     return "INTEGRAL_CAST";
+  case CastKind::FLOATING_CAST:
+    return "FLOATING_CAST";
   case CastKind::INTEGRAL_TO_FLOATING:
     return "INTEGRAL_TO_FLOATING";
   case CastKind::FLOATING_TO_INTEGRAL:
@@ -190,6 +192,36 @@ std::string_view to_string(CastKind kind) {
   case CastKind::FUNCTION_TO_PTR:
     return "FUNCTION_TO_PTR";
   case CastKind::POINTER_CAST:
-    return "POINTER_CAS";
+    return "POINTER_CAST";
   }
+}
+
+std::optional<CastKind> BuiltInType::convertible_to(Type *to) {
+  if (is_arithmetic() && to->is_arithmetic()) {
+    if (is_integral()) {
+      if (to->is_floating()) {
+        return CastKind::INTEGRAL_TO_FLOATING;
+      } else {
+        return CastKind::INTEGRAL_CAST;
+      }
+    } else {
+      if (to->is_integral()) {
+        return CastKind::FLOATING_TO_INTEGRAL;
+      } else {
+        return CastKind::FLOATING_CAST;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+std::optional<CastKind> PointerType::convertible_to(Type *to) {
+  if (to->is_pointer()) {
+    auto base = remove_pointer()->remove_qualifier();
+    auto base_to = remove_pointer()->remove_pointer();
+    if (base->is_void() || base_to->is_void()) {
+      return CastKind::POINTER_CAST;
+    }
+  }
+  return std::nullopt;
 }
