@@ -9,6 +9,7 @@ std::string_view to_string(TypeQualifier qual) {
   case TypeQualifier::VOLATILE:
     return "volatile";
   }
+  return "";
 }
 
 Type::Type(Type *base_type) : base_type_(base_type) {}
@@ -38,12 +39,13 @@ Type *Type::qual_type(TypeQualifier qual) {
 }
 
 Type *Type::decay_type() {
-  assert(base_type());
   if (is_array()) {
+    assert(base_type());
     return base_type()->pointer_type();
   } else if (is_function()) {
     return pointer_type();
   }
+  return this;
 }
 
 QualType::QualType(Type *base_type, TypeQualifier qual)
@@ -143,6 +145,7 @@ size_t BuiltInType::size() {
   case BuiltInTypeName::VOID:
     return 0;
   }
+  return 0;
 }
 
 Type *PointerType::remove_pointer() { return base_type(); }
@@ -194,6 +197,7 @@ std::string_view to_string(CastKind kind) {
   case CastKind::POINTER_CAST:
     return "POINTER_CAST";
   }
+  return "";
 }
 
 std::optional<CastKind> BuiltInType::convertible_to(Type *to) {

@@ -1,8 +1,9 @@
 #include "symbol_table.h"
 
 /* set initial bucket size  for all scope tables, set currentScope as null */
-SymbolTable::SymbolTable(size_t init_bucket_size)
-    : k_init_bucket_size_(init_bucket_size), current_scope_(nullptr) {
+SymbolTable::SymbolTable(size_t init_bucket_size, Logger *logger)
+    : k_init_bucket_size_(init_bucket_size), current_scope_(nullptr),
+      logger_(logger) {
   // initialse the global scope
   enter_scope();
 }
@@ -69,14 +70,14 @@ SymbolInfo *SymbolTable::look_up(std::string_view name) {
 
 void SymbolTable::log_current_scope() {
   if (current_scope_) {
-    current_scope_->log();
+    current_scope_->log(logger_);
   }
 }
 
 void SymbolTable::log_all_scopes() {
   auto *s = current_scope_;
   while (s) {
-    s->log();
+    s->log(logger_);
     s = s->parent_scope();
   }
 }

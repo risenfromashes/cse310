@@ -50,7 +50,7 @@ public:
   size_t id() { return id_; }
 
   /* Print contents to output string */
-  void log();
+  void log(Logger *logger);
 
 private:
   static inline size_t last_id_ = 1;

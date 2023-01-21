@@ -9,3 +9,6 @@ NonTerminal::NonTerminal(std::string_view name) : PTNode(name) {}
 void NonTerminal::add_child(PTNode *child) {
   children_.push_back(std::unique_ptr<PTNode>(child));
 }
+
+void NonTerminal::print(ParserContext *context) {}
+void Terminal::print(ParserContext *context) {}

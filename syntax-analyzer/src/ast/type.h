@@ -101,7 +101,7 @@ public:
 
   TypeQualifier qualifier() { return qual_; }
 
-  std::optional<CastKind> convertible_to(Type *to) override;
+  // std::optional<CastKind> convertible_to(Type *to) override;
   Type *remove_pointer() override;
   bool is_pointer() override;
   bool is_const() override;
@@ -133,7 +133,7 @@ public:
 
   bool is_array() override { return true; }
 
-  std::optional<CastKind> convertible_to(Type *to) override;
+  // std::optional<CastKind> convertible_to(Type *to) override;
 
   SizedArrayType *sized_array(size_t size);
 
@@ -145,7 +145,7 @@ class SizedArrayType : public ArrayType {
 public:
   SizedArrayType(Type *base_type, size_t size);
 
-  std::optional<CastKind> convertible_to(Type *to) override;
+  // std::optional<CastKind> convertible_to(Type *to) override;
 
   size_t array_size() { return array_size_; }
 

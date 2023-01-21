@@ -30,6 +30,7 @@ std::string_view to_string(UnaryOp op) {
   case UnaryOp::ADDRESS:
     return "&";
   }
+  return "";
 }
 
 std::string_view to_string(BinaryOp op) {
@@ -63,6 +64,7 @@ std::string_view to_string(BinaryOp op) {
   case BinaryOp::LOGIC_OR:
     return "||";
   }
+  return "";
 }
 
 std::string_view to_string(ValueType type) {
@@ -72,6 +74,7 @@ std::string_view to_string(ValueType type) {
   case ValueType::RVALUE:
     return "rvalue";
   }
+  return "";
 }
 
 Expr::Expr(Location loc, Type *type, ValueType value_type)
@@ -584,6 +587,14 @@ Expr *ArraySubscriptExpr::create(ParserContext *context, Location loc,
   }
 
   return new ArraySubscriptExpr(context, loc, arr, subscript);
+}
+
+Type *ArraySubscriptExpr::determine_type(ParserContext *context) {
+  return array()->type()->remove_pointer();
+}
+
+ValueType ArraySubscriptExpr::determine_value_type() {
+  return ValueType::LVALUE;
 }
 
 IntLiteral::IntLiteral(ParserContext *context, Location loc, int value)

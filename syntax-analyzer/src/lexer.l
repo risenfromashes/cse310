@@ -156,8 +156,8 @@ void ParserContext::init_scanner()
 void ParserContext::finish_scanner(){
     auto line = yyget_lineno(scanner_);
     table_.log_all_scopes();
-    Log::write("Total lines: {}\n", line);
-    Log::write("Total errors: {}\n", error_count_);
+    logger_.write("Total lines: {}\n", line);
+    logger_.write("Total errors: {}\n", error_count_);
     yylex_destroy(scanner_);
 }
 

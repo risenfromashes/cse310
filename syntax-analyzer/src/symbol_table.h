@@ -5,7 +5,7 @@
 
 class SymbolTable {
 public:
-  SymbolTable(size_t init_bucket_size);
+  SymbolTable(size_t init_bucket_size, Logger *logger);
   ~SymbolTable();
 
   /* enter into new scope, creating new scope table */
@@ -32,6 +32,7 @@ public:
   void log_all_scopes();
 
 private:
+  Logger *logger_;
   const size_t k_init_bucket_size_;
 
   std::allocator<ScopeTable> allocator_;

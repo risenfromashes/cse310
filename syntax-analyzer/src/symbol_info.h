@@ -4,7 +4,7 @@
 #include <iostream>
 #include <string>
 
-enum class SymbolType { VAR, FUNC, PARAM };
+enum class SymbolType { VAR, FUNC, PARAM, TYPE };
 
 class Decl;
 
@@ -28,7 +28,7 @@ public:
   Decl *decl() const { return decl_; }
 
   /* Log Symbol info */
-  void log();
+  void log(Logger *logger);
 
 private:
   std::string name_;

@@ -229,6 +229,6 @@ void ASTPrinter::space() {
 
 void ASTPrinter::log_location(ASTNode *node) {
   auto &loc = node->location();
-  logger_->write("<line:{}:{}, line:{}:{} ", loc.start_row(), loc.start_col(),
-                 loc.end_row(), loc.end_col());
+  logger_->write("<line:{}:{}, line:{}:{} ", loc.start_line(), loc.start_col(),
+                 loc.end_line(), loc.end_col());
 }

@@ -6,11 +6,14 @@
 #include <variant>
 #include <vector>
 
-#include <ast/ast_node.h>
-
-#include "ast/ast_visitor.h"
 #include "parser_context.h"
 #include "token.h"
+
+#include "ast/ast_visitor.h"
+#include <ast/cast.h>
+#include <ast/decl.h>
+#include <ast/expr.h>
+#include <ast/stmt.h>
 
 using Stmts = std::vector<std::unique_ptr<Stmt>>;
 using VarDecls = std::vector<std::unique_ptr<VarDecl>>;

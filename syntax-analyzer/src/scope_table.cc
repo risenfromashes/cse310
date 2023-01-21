@@ -95,15 +95,15 @@ bool ScopeTable::remove(std::string_view name) {
   return curr;
 }
 
-void ScopeTable::log() {
-  Log::writeln("\tScopeTable# {}", id_);
+void ScopeTable::log(Logger *logger) {
+  logger->writeln("\tScopeTable# {}", id_);
   for (size_t i = 0; i < num_buckets_; i++) {
     if (table_[i]) {
-      Log::write("\t{}--> ", i + 1);
+      logger->write("\t{}--> ", i + 1);
       for (SymbolInfo *p = table_[i]; p; p = p->next()) {
-        p->log();
+        p->log(logger);
       }
-      Log::endl();
+      logger->endl();
     }
   }
 }

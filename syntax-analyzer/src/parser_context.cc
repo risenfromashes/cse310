@@ -8,7 +8,7 @@
 #include <parser.tab.h>
 
 ParserContext::ParserContext(FILE *input)
-    : error_count_(0), table_(10), in_file_(input) {
+    : error_count_(0), table_(10, &logger_), in_file_(input) {
   init_scanner();
 }
 

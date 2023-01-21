@@ -2,8 +2,8 @@
 #include "parser.tab.h"
 
 Location::Location(YYLTYPE *yylloc) {
-  start_row_ = yylloc->first_line;
+  start_line_ = yylloc->first_line;
   start_col_ = yylloc->first_column;
-  end_row_ = yylloc->last_line;
+  end_line_ = yylloc->last_line;
   end_col_ = yylloc->last_column;
 }

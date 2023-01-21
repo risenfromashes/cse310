@@ -36,6 +36,25 @@ add_executable(parser
   src/scope_table.h
   src/scope_table.cc
   src/symbol_info.h
+  src/symbol_info.cc
+  src/location.h
+  src/location.cc
+  src/pt/pt_node.h
+  src/pt/pt_node.cc
+  src/ast/ast_node.h
+  src/ast/ast_visitor.h
+  src/ast/ast_printer.h
+  src/ast/ast_printer.cc
+  src/ast/cast.h
+  src/ast/cast.cc
+  src/ast/expr.h
+  src/ast/expr.cc
+  src/ast/stmt.h
+  src/ast/stmt.cc
+  src/ast/decl.h
+  src/ast/decl.cc
+  src/ast/type.h
+  src/ast/type.cc
 )
 
 target_link_libraries(parser PRIVATE fmt::fmt)
