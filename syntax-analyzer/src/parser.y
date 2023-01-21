@@ -11,6 +11,13 @@
 #include <cstdarg>
 #include <token.h>
 #include <parser_context.h>
+
+#include <ast/stmt.h>
+#include <ast/expr.h>
+#include <ast/decl.h>
+#include <ast/type.h>
+#include <pt/pt_node.h>
+
 #define YYLEX_PARAM context->scanner()
 
 }

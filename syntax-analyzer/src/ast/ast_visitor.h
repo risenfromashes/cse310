@@ -20,16 +20,19 @@ class WhileStmt;
 class ForStmt;
 class ReturnStmt;
 
+class ImplicitCastExpr;
 class UnaryExpr;
 class BinaryExpr;
+class RefExpr;
+class CallExpr;
 
 class FuncDecl;
 class ParamDecl;
 class VarDecl;
 
-class IntLit;
-class CharLit;
-class StrLit;
+class IntLiteral;
+class CharLiteral;
+class StrLiteral;
 
 class ASTVisitor {
 public:
