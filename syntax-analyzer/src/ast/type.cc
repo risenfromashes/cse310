@@ -100,6 +100,9 @@ BuiltInType::BuiltInType(BuiltInTypeName type_name) : type_name_(type_name) {
   case BuiltInTypeName::FLOAT:
     set_name("float");
     break;
+  case BuiltInTypeName::DOUBLE:
+    set_name("double");
+    break;
   case BuiltInTypeName::VOID:
     set_name("void");
     break;
@@ -155,7 +158,20 @@ size_t QualType::size() { return base_type()->size(); }
 bool BuiltInType::is_void() { return type_name_ == BuiltInTypeName::VOID; }
 
 FuncType::FuncType(Type *ret_type, std::vector<Type *> param_types)
-    : return_type_(ret_type), param_types_(std::move(param_types)) {}
+    : return_type_(ret_type), param_types_(std::move(param_types)) {
+  std::string name;
+  name.append(ret_type->name());
+  name.append(" (");
+  for (auto i = 0; i < param_types_.size(); i++) {
+    auto type = param_types_[i];
+    name.append(type->name());
+    if (i < param_types_.size() - 1) {
+      name.append(", ");
+    }
+  }
+  name.append(")");
+  set_name(std::move(name));
+}
 
 std::string_view to_string(CastKind kind) {
   switch (kind) {

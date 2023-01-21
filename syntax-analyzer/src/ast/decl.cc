@@ -1,5 +1,6 @@
 #include "ast/decl.h"
 #include "ast/expr.h"
+#include "ast/stmt.h"
 #include "ast/type.h"
 
 Decl::Decl(Location loc, Type *type) : ASTNode(loc), type_(type) {}
@@ -39,8 +40,10 @@ FuncDecl::FuncDecl(Location loc, FuncType *type,
 
 Decl *FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
                        std::vector<std::unique_ptr<ParamDecl>> params,
-                       std::string name, CompoundStmt *definition) {
+                       std::string name, ASTNode *_definition) {
   std::vector<Type *> param_types;
+  auto definition = dynamic_cast<CompoundStmt *>(_definition);
+
   for (auto &param : params) {
     param_types.push_back(param->type());
   }
@@ -71,4 +74,13 @@ Decl *FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
   }
 
   return ret;
+}
+
+TranslationUnitDecl::TranslationUnitDecl(
+    Location loc, std::vector<std::unique_ptr<Decl>> decls)
+    : ASTNode(loc), decl_units_(std::move(decls)) {}
+
+TranslationUnitDecl *create(ParserContext *context, Location loc,
+                            std::vector<std::unique_ptr<Decl>> decls) {
+  return new TranslationUnitDecl(loc, std::move(decls));
 }

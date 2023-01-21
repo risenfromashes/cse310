@@ -62,6 +62,7 @@ public:
 
   bool is_arithmetic() { return is_integral() || is_floating(); }
 
+  virtual bool is_scalar() { return true; }
   virtual bool is_void() { return false; }
   virtual bool is_integral() { return false; }
   virtual bool is_floating() { return false; }

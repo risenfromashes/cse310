@@ -55,6 +55,8 @@ public:
   static Stmt *create(ParserContext *context, Location loc,
                       std::vector<std::unique_ptr<Stmt>> stmts);
 
+  const std::vector<std::unique_ptr<Stmt>> &stmts() { return stmts_; }
+
   void visit(ASTVisitor *visitor) override {
     visitor->visit_compound_stmt(this);
   }
@@ -71,6 +73,10 @@ public:
                       ASTNode *if_case, ASTNode *else_case);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_if_stmt(this); }
+
+  Expr *condition() { return condition_.get(); }
+  Stmt *if_case() { return if_case_.get(); }
+  Stmt *else_case() { return else_case_.get(); }
 
 private:
   std::unique_ptr<Expr> condition_;
@@ -106,7 +112,7 @@ public:
 
   ExprStmt *init_expr() { return init_.get(); }
   ExprStmt *loop_condition() { return condition_.get(); }
-  Expr *increment_expr() { return iter_.get(); }
+  Expr *iteration_expr() { return iter_.get(); }
 
 private:
   std::unique_ptr<ExprStmt> init_;
@@ -122,6 +128,7 @@ public:
 
   void visit(ASTVisitor *visitor) override { visitor->visit_return_stmt(this); }
 
+  /* can be null */
   Expr *expr() { return expr_.get(); }
 
 private:

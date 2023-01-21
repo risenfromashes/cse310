@@ -57,7 +57,7 @@ public:
 
   static Decl *create(ParserContext *context, Location loc, Type *ret_type,
                       std::vector<std::unique_ptr<ParamDecl>> params,
-                      std::string name, CompoundStmt *definition = nullptr);
+                      std::string name, ASTNode *definition = nullptr);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_func_decl(this); }
 
@@ -74,4 +74,21 @@ private:
   std::unique_ptr<FuncType> type_;
   std::string name_;
   CompoundStmt *definition_;
+};
+
+class TranslationUnitDecl : public ASTNode {
+public:
+  TranslationUnitDecl(Location loc, std::vector<std::unique_ptr<Decl>> decls);
+
+  static TranslationUnitDecl *create(ParserContext *context, Location loc,
+                                     std::vector<std::unique_ptr<Decl>> decls);
+
+  const std::vector<std::unique_ptr<Decl>> &decl_units() { return decl_units_; }
+
+  void visit(ASTVisitor *visitor) override {
+    visitor->visit_translation_unit_decl(this);
+  }
+
+private:
+  std::vector<std::unique_ptr<Decl>> decl_units_;
 };

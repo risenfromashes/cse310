@@ -1,4 +1,5 @@
 #include "ast/stmt.h"
+#include "ast/cast.h"
 #include "ast/decl.h"
 #include "ast/expr.h"
 
@@ -9,6 +10,10 @@ ExprStmt::ExprStmt(Location loc, Expr *expr) : Stmt(loc), expr_(expr) {}
 Stmt *ExprStmt::create(ParserContext *context, Location loc, ASTNode *_expr) {
   auto expr = dynamic_cast<Expr *>(_expr);
   assert(expr);
+  expr = expr->decay();
+  if (expr->value_type() == ValueType::LVALUE) {
+    expr = expr->to_rvalue();
+  }
   return new ExprStmt(loc, expr);
 }
 
@@ -38,6 +43,15 @@ Stmt *IfStmt::create(ParserContext *context, Location loc, ASTNode *_cond,
   auto if_ = dynamic_cast<Stmt *>(_if);
   auto else_ = dynamic_cast<Stmt *>(_else);
   assert(cond && if_ && else_);
+  cond = cond->decay();
+  if (cond->value_type() == ValueType::LVALUE) {
+    cond = cond->to_rvalue();
+  }
+
+  if (!cond->type()->is_scalar()) {
+    context->report_error(loc, "If condition is not scalar");
+  }
+
   return new IfStmt(loc, cond, if_, else_);
 }
 
@@ -49,6 +63,14 @@ Stmt *WhileStmt::create(ParserContext *context, Location loc, ASTNode *_cond,
   auto cond = dynamic_cast<Expr *>(_cond);
   auto body = dynamic_cast<Stmt *>(_body);
   assert(cond && body);
+  cond = cond->decay();
+  if (cond->value_type() == ValueType::LVALUE) {
+    cond = cond->to_rvalue();
+  }
+
+  if (!cond->type()->is_scalar()) {
+    context->report_error(loc, "While condition is not scalar");
+  }
   return new WhileStmt(loc, cond, body);
 }
 
@@ -61,6 +83,9 @@ Stmt *ForStmt::create(ParserContext *context, Location loc, ASTNode *_init,
   auto cond = dynamic_cast<ExprStmt *>(_cond);
   auto iter = dynamic_cast<Expr *>(_iter);
   assert(init && cond && iter);
+  if (!cond->expr()->type()->is_scalar()) {
+    context->report_error(loc, "For loop condition is not scalar");
+  }
   return new ForStmt(loc, init, cond, iter);
 }
 
@@ -68,6 +93,5 @@ ReturnStmt::ReturnStmt(Location loc, Expr *expr) : Stmt(loc), expr_(expr) {}
 
 Stmt *ReturnStmt::create(ParserContext *context, Location loc, Expr *_expr) {
   auto expr = dynamic_cast<Expr *>(_expr);
-  assert(expr);
   return new ReturnStmt(loc, expr);
 }

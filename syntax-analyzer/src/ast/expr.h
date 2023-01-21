@@ -77,6 +77,8 @@ public:
   void add_child(ASTNode *node);
   void add_child(std::unique_ptr<ASTNode> node);
 
+  const std::vector<std::unique_ptr<ASTNode>> &children() { return children_; }
+
   void visit(ASTVisitor *visitor) override {
     visitor->visit_recovery_expr(this);
   }
@@ -134,11 +136,13 @@ private:
 /* reference to something */
 class RefExpr : public Expr {
 public:
-  RefExpr(ParserContext *context, Location loc, Decl *decl);
+  RefExpr(ParserContext *context, Location loc, Decl *decl, std::string name);
 
   static Expr *create(ParserContext *context, Location loc, Token *id);
 
   Decl *decl() { return decl_; }
+
+  std::string_view name() { return name_; }
 
   void visit(ASTVisitor *visitor) override { visitor->visit_ref_expr(this); }
 
@@ -147,6 +151,7 @@ private:
   ValueType determine_value_type();
 
   Decl *decl_;
+  std::string name_;
 };
 
 class CallExpr : public Expr {

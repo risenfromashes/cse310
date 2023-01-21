@@ -413,8 +413,10 @@ Type *BinaryExpr::determine_type(ParserContext *context) {
 
 ValueType BinaryExpr::determine_value_type() { return ValueType::RVALUE; }
 
-RefExpr::RefExpr(ParserContext *context, Location loc, Decl *decl)
-    : Expr(loc, determine_type(context), determine_value_type()), decl_(decl) {}
+RefExpr::RefExpr(ParserContext *context, Location loc, Decl *decl,
+                 std::string name)
+    : Expr(loc, determine_type(context), determine_value_type()), decl_(decl),
+      name_(std::move(name)) {}
 
 Expr *RefExpr::create(ParserContext *context, Location loc, Token *token) {
   if (!token->value()) {
@@ -430,7 +432,7 @@ Expr *RefExpr::create(ParserContext *context, Location loc, Token *token) {
     return ret;
   }
 
-  return new RefExpr(context, loc, decl);
+  return new RefExpr(context, loc, decl, token->move_value());
 }
 
 Type *RefExpr::determine_type(ParserContext *context) { return decl()->type(); }

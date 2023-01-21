@@ -55,6 +55,18 @@ public:
   bool insert_symbol(std::string_view name, SymbolType type, Decl *decl);
   Decl *lookup_symbol(std::string_view name);
 
+  Logger *logger() { return &logger_; }
+  Logger *ast_logger() { return &ast_logger_; }
+  Logger *pt_logger() { return &pt_logger_; }
+  Logger *error_logger() { return &error_logger_; }
+
+  void set_logger_file(const char *path) { logger_.set_out_file(path); }
+  void set_ast_logger_file(const char *path) { ast_logger_.set_out_file(path); }
+  void set_pt_logger_file(const char *path) { pt_logger_.set_out_file(path); }
+  void set_error_logger_file(const char *path) {
+    error_logger_.set_out_file(path);
+  }
+
 private:
   void init_scanner();
   void finish_scanner();
@@ -70,8 +82,10 @@ private:
   FILE *in_file_;
 
   /* loggers */
-  Logger error_logger_;
   Logger logger_;
+  Logger ast_logger_;
+  Logger pt_logger_;
+  Logger error_logger_;
 
   /* symbol table */
   SymbolTable table_;

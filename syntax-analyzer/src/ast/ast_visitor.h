@@ -15,6 +15,7 @@ class ReturnStmt;
 class FuncDecl;
 class ParamDecl;
 class VarDecl;
+class TranslationUnitDecl;
 
 class UnaryExpr;
 class BinaryExpr;
@@ -44,6 +45,7 @@ public:
   virtual void visit_func_decl(FuncDecl *func_decl) = 0;
   virtual void visit_param_decl(ParamDecl *param_decl) = 0;
   virtual void visit_var_decl(VarDecl *var_decl) = 0;
+  virtual void visit_translation_unit_decl(TranslationUnitDecl *trans_decl) = 0;
 
   virtual void visit_unary_expr(UnaryExpr *unary_expr) = 0;
   virtual void visit_binary_expr(BinaryExpr *binary_expr) = 0;

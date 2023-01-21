@@ -10,6 +10,9 @@ public:
     visitor->visit_implicit_cast_expr(this);
   }
 
+  CastKind cast_kind() { return cast_kind_; }
+  Expr *source_expr() { return src_expr_; }
+
 private:
   Type *determine_type();
   ValueType determine_value_type();
