@@ -8,8 +8,8 @@ Decl::Decl(Location loc, Type *type) : ASTNode(loc), type_(type) {}
 VarDecl::VarDecl(Location loc, Type *type, std::string name)
     : Decl(loc, type), name_(std::move(name)) {}
 
-std::unique_ptr<Decl> VarDecl::create(ParserContext *context, Location loc, Type *type,
-                                      std::string name)
+std::unique_ptr<VarDecl> VarDecl::create(ParserContext *context, Location loc, Type *type,
+                                         std::string name)
 {
   auto ret = new VarDecl(loc, type, std::move(name));
   auto prev_decl = context->lookup_symbol(name);
@@ -22,19 +22,19 @@ std::unique_ptr<Decl> VarDecl::create(ParserContext *context, Location loc, Type
   {
     context->insert_symbol(name, SymbolType::VAR, ret);
   }
-  return std::unique_ptr<Decl>(ret);
+  return std::unique_ptr<VarDecl>(ret);
 }
 
 ParamDecl::ParamDecl(Location loc, Type *type, std::string name)
     : Decl(loc, type), name_(std::move(name)) {}
 
-std::unique_ptr<Decl> ParamDecl::create(ParserContext *context, Location loc, Type *type,
-                                        std::string name)
+std::unique_ptr<ParamDecl> ParamDecl::create(ParserContext *context, Location loc, Type *type,
+                                             std::string name)
 {
   auto ret = new ParamDecl(loc, type, std::move(name));
   auto prev_decl = context->lookup_symbol(name);
 
-  return std::unique_ptr<Decl>(ret);
+  return std::unique_ptr<ParamDecl>(ret);
 }
 
 FuncDecl::FuncDecl(Location loc, FuncType *type,
@@ -43,9 +43,9 @@ FuncDecl::FuncDecl(Location loc, FuncType *type,
     : Decl(loc, type), params_(std::move(params)), type_(type),
       name_(std::move(name)), definition_(definition) {}
 
-std::unique_ptr<Decl> FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
-                                       std::vector<std::unique_ptr<ParamDecl>> params,
-                                       std::string name, std::unique_ptr<CompoundStmt> _definition)
+std::unique_ptr<FuncDecl> FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
+                                           std::vector<std::unique_ptr<ParamDecl>> params,
+                                           std::string name, std::unique_ptr<CompoundStmt> _definition)
 {
   std::vector<Type *> param_types;
   auto definition = _definition.release();
@@ -86,15 +86,15 @@ std::unique_ptr<Decl> FuncDecl::create(ParserContext *context, Location loc, Typ
     context->insert_symbol(name, SymbolType::FUNC, ret);
   }
 
-  return std::unique_ptr<Decl>(ret);
+  return std::unique_ptr<FuncDecl>(ret);
 }
 
 TranslationUnitDecl::TranslationUnitDecl(
     Location loc, std::vector<std::unique_ptr<Decl>> decls)
     : ASTNode(loc), decl_units_(std::move(decls)) {}
 
-TranslationUnitDecl *create(ParserContext *context, Location loc,
-                            std::vector<std::unique_ptr<Decl>> decls)
+std::unique_ptr<TranslationUnitDecl> TranslationUnitDecl::create(ParserContext *context, Location loc,
+                                                                 std::vector<std::unique_ptr<Decl>> decls)
 {
-  return new TranslationUnitDecl(loc, std::move(decls));
+  return std::unique_ptr<TranslationUnitDecl>(new TranslationUnitDecl(loc, std::move(decls)));
 }

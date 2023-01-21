@@ -2,9 +2,10 @@
 
 struct YYLTYPE;
 
-class Location {
+class Location
+{
 public:
-  Location(YYLTYPE *yylloc);
+  Location(YYLTYPE yylloc);
 
   int start_line() { return start_line_; }
   int start_col() { return start_col_; }

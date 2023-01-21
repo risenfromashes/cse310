@@ -127,6 +127,11 @@ void RecoveryExpr::add_child(std::unique_ptr<ASTNode> node)
   children_.push_back(std::move(node));
 }
 
+void RecoveryExpr::add_child(ASTNode *node)
+{
+  children_.push_back(std::unique_ptr<ASTNode>(node));
+}
+
 UnaryExpr::UnaryExpr(ParserContext *context, Location loc, UnaryOp op,
                      Expr *operand)
     : Expr(loc, determine_type(context), determine_value_type()), op_(op),

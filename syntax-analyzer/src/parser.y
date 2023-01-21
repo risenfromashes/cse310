@@ -60,8 +60,8 @@ void lyyerror(YYLTYPE t, char *s, ...);
 
 start : program {
     $$ = NonTerminal::create("start", $1);
-    auto root = TranslationUnitDecl::create(context, @$, $1->decls());
-    context->set_ast_root(root)
+    auto root = TranslationUnitDecl::create(context, @$, std::move($1->decls()));
+    context->set_ast_root(std::move(root));
     context->set_pt_root($$);
 	}
 	;
@@ -81,33 +81,36 @@ program : program unit {
 	
 unit : var_declaration {
         $$ = NonTerminal::create("unit", $1);
-        $$->ast = Decls(std::move($1->vardecls()));
+        $$->ast = Decls();
+        for(auto& v: $1->vardecls()){
+          $$->decls().push_back(std::move(v));
+        }
      }
      | func_declaration {
         $$ = NonTerminal::create("unit", $1);
-        $$->ast = Decls{}; 
-        $$->decls()->push_back(std::move($1->decl()));
+        $$->ast = Decls(); 
+        $$->decls().push_back(std::move($1->decl()));
      }
      | func_definition { 
         $$ = NonTerminal::create("unit", $1);
         $$->ast = Decls{}; 
-        $$->decls()->push_back(std::move($1->decl()));
+        $$->decls().push_back(std::move($1->decl()));
      }
      ;
      
 func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
         $$ = NonTerminal::create("func_declaration", $1, $2, $3, $4, $5, $6);
-        $$->ast = FuncDecl::create(context, @$, $1, 
+        $$->ast = FuncDecl::create(context, @$, $1->type(), 
                                     std::move($4->paramdecls()),
-                                    token->move_value(), nullptr);
+                                    $2->move_value(), nullptr);
         /* no declaration to follow */
         context->current_params(nullptr);
     }
 		| type_specifier ID LPAREN RPAREN SEMICOLON {
         $$ = NonTerminal::create("func_declaration", $1, $2, $3, $4, $5);
-        $$->ast = FuncDecl::create(context, @$, $1, 
+        $$->ast = FuncDecl::create(context, @$, $1->type(), 
                                     ParamDecls(),
-                                    token->move_value(), nullptr);
+                                    $2->move_value(), nullptr);
         /* no declaration to follow */
         context->current_params(nullptr);
     }
@@ -115,15 +118,15 @@ func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
 		 
 func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement {
         $$ = NonTerminal::create("func_definition", $1, $2, $3, $4, $5, $6);
-        $$->ast = FuncDecl::create(context, @$, $1, 
+        $$->ast = FuncDecl::create(context, @$, $1->type(), 
                                     std::move($4->paramdecls()),
-                                    token->move_value(), $6->stmt());
+                                    $2->move_value(), std::move($6->compound_stmt()));
     }
 		| type_specifier ID LPAREN RPAREN compound_statement {
         $$ = NonTerminal::create("func_definition", $1, $2, $3, $4, $5);
-        $$->ast = FuncDecl::create(context, @$, $1, 
+        $$->ast = FuncDecl::create(context, @$, $1->type(), 
                                     ParamDecls(),
-                                    token->move_value(), $6->stmt());
+                                    $2->move_value(), std::move($5->compound_stmt()));
     }
  		;				
 
@@ -135,7 +138,7 @@ parameter_list  : parameter_list COMMA type_specifier ID {
     }
 		| parameter_list COMMA type_specifier {
         $$ = NonTerminal::create("parameter_list", $1, $2, $3);
-        $$->paramdecls().push_back(aramDecl::create(context, @$, $3->type(), "");
+        $$->paramdecls().push_back(ParamDecl::create(context, @$, $3->type(), ""));
     }
  		| type_specifier ID {
         $$ = NonTerminal::create("parameter_list", $1, $2);
@@ -154,12 +157,12 @@ parameter_list  : parameter_list COMMA type_specifier ID {
  		
 compound_statement : LCURL statements RCURL {
           $$ = NonTerminal::create("compound_statement", $1, $2, $3);
-          $$->ast = CompoundStatement::create(context, @$, std::move($$->stmts()));
+          $$->ast = CompoundStmt::create(context, @$, std::move($$->stmts()));
           context->exit_scope();
         }
  		    | LCURL RCURL {
           $$ = NonTerminal::create("compound_statement", $1, $2);
-          $$->ast = CompoundStatement::create(context, @$, std::move($$->stmts()));
+          $$->ast = CompoundStmt::create(context, @$, std::move($$->stmts()));
           context->exit_scope();
         }
  		    ;
@@ -204,7 +207,7 @@ declaration_list : declaration_list COMMA ID {
           $$ = NonTerminal::create("declaration_list", $1);
           $$->ast = VarDecls{};
           $$->vardecls().push_back(
-              VarDecl::create(context, @3, context->current_type(), $1->move_value()));
+              VarDecl::create(context, @$, context->current_type(), $1->move_value()));
       }
  		  | ID LSQUARE CONST_INT RSQUARE {
           $$ = NonTerminal::create("declaration_list", $1, $2, $3, $4);
@@ -219,12 +222,12 @@ declaration_list : declaration_list COMMA ID {
 statements : statement {
           $$ = NonTerminal::create("statements", $1);
           $$->ast = Stmts{};
-          $$->stmts.push_back(std::move($1->stmt()));
+          $$->stmts().push_back(std::move($1->stmt()));
       }
 	   | statements statement {
           $$ = NonTerminal::create("statements", $1, $2);
           $$->ast = std::move($1->ast);
-          $$->stmts.push_back(std::move($2->stmt()));
+          $$->stmts().push_back(std::move($2->stmt()));
      }
 	   ;
 	   

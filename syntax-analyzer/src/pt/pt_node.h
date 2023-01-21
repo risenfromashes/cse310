@@ -6,7 +6,6 @@
 #include <variant>
 #include <vector>
 
-#include "parser_context.h"
 #include "token.h"
 
 #include "ast/ast_visitor.h"
@@ -14,6 +13,8 @@
 #include <ast/decl.h>
 #include <ast/expr.h>
 #include <ast/stmt.h>
+
+class ParserContext;
 
 using Stmts = std::vector<std::unique_ptr<Stmt>>;
 using VarDecls = std::vector<std::unique_ptr<VarDecl>>;
@@ -59,13 +60,13 @@ public:
 
   Type *type() { return std::get<Type *>(ast); }
 
-  std::unique_ptr<ASTNode> &node()
-  {
-    return std::get<std::unique_ptr<ASTNode>>(ast);
-  }
   std::unique_ptr<Stmt> &stmt()
   {
     return std::get<std::unique_ptr<Stmt>>(ast);
+  }
+  std::unique_ptr<CompoundStmt> &compound_stmt()
+  {
+    return std::get<std::unique_ptr<CompoundStmt>>(ast);
   }
   std::unique_ptr<Decl> &decl()
   {
@@ -83,12 +84,12 @@ public:
   Decls &decls() { return std::get<Decls>(ast); }
 
   std::variant<
-      std::unique_ptr<ASTNode>,
       std::unique_ptr<Expr>,
       std::unique_ptr<Stmt>,
+      std::unique_ptr<CompoundStmt>,
       std::unique_ptr<Decl>,
       Type *, Stmts, VarDecls, ParamDecls,
-      Exprs>
+      Exprs, Decls>
       ast;
 
 private:
@@ -112,8 +113,8 @@ void NonTerminal::add_children(auto &&child, auto &&...other)
   {
     add_child(child);
   }
-  if (sizeof...(other))
+  if constexpr (sizeof...(other) > 0)
   {
-    return add_children(std::forward<decltype(other)>(other)...);
+    add_children(std::forward<decltype(other)>(other)...);
   }
 }

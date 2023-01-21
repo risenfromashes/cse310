@@ -6,15 +6,27 @@
 #include <unordered_map>
 #include <vector>
 
-enum class TypeQualifier { CONST, VOLATILE };
+enum class TypeQualifier
+{
+  CONST,
+  VOLATILE
+};
 constexpr int TYPE_QUALIFIER_COUNT = 2;
 
 std::string_view to_string(TypeQualifier qual);
 
-enum class BuiltInTypeName : int { VOID = 0, INT, FLOAT, CHAR, DOUBLE };
+enum class BuiltInTypeName : int
+{
+  VOID = 0,
+  INT,
+  FLOAT,
+  CHAR,
+  DOUBLE
+};
 constexpr int BUILT_IN_TYPE_COUNT = 4;
 
-enum class CastKind {
+enum class CastKind
+{
   LVALUE_TO_RVALUE,
   ARRAY_TO_POINTER,
   INTEGRAL_CAST,
@@ -28,7 +40,8 @@ enum class CastKind {
 
 std::string_view to_string(CastKind kind);
 
-struct EnvConsts {
+struct EnvConsts
+{
 public:
   inline static int int_size = 16;
   inline static int float_size = 16;
@@ -38,7 +51,8 @@ public:
 
 class ImplicitCastExpr;
 
-class Type {
+class Type
+{
   friend class TypeTable;
 
 public:
@@ -49,7 +63,8 @@ public:
 
   /* checks if type is implicitly castable to type 'to' */
   /* returns cast kind if so */
-  virtual std::optional<CastKind> convertible_to(Type *to) {
+  virtual std::optional<CastKind> convertible_to(Type *to)
+  {
     return std::nullopt;
   }
 
@@ -58,6 +73,7 @@ public:
   Type *array_type();
   Type *qual_type(TypeQualifier qualifier);
   Type *decay_type();
+  virtual Type *sized_array(size_t size);
 
   /* meta data */
 
@@ -95,7 +111,8 @@ private:
   std::string name_;
 };
 
-class QualType : public Type {
+class QualType : public Type
+{
 public:
   QualType(Type *base_type, TypeQualifier qualifier);
 
@@ -113,7 +130,8 @@ private:
   TypeQualifier qual_;
 };
 
-class PointerType : public Type {
+class PointerType : public Type
+{
 public:
   PointerType(Type *base_type);
 
@@ -127,7 +145,8 @@ public:
 
 class SizedArrayType;
 
-class ArrayType : public Type {
+class ArrayType : public Type
+{
 public:
   ArrayType(Type *base_type);
 
@@ -135,13 +154,14 @@ public:
 
   // std::optional<CastKind> convertible_to(Type *to) override;
 
-  SizedArrayType *sized_array(size_t size);
+  Type *sized_array(size_t size) override;
 
 private:
   std::unordered_map<size_t, std::unique_ptr<SizedArrayType>> sized_arrays_;
 };
 
-class SizedArrayType : public ArrayType {
+class SizedArrayType : public ArrayType
+{
 public:
   SizedArrayType(Type *base_type, size_t size);
 
@@ -153,7 +173,8 @@ private:
   size_t array_size_;
 };
 
-class BuiltInType : public Type {
+class BuiltInType : public Type
+{
 public:
   BuiltInType(BuiltInTypeName type);
 
@@ -169,7 +190,8 @@ private:
   BuiltInTypeName type_name_;
 };
 
-class FuncType : public Type {
+class FuncType : public Type
+{
 public:
   FuncType(Type *ret_type, std::vector<Type *> arg_types);
 

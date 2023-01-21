@@ -9,6 +9,8 @@
 #include <token.h>
 #include <pt/pt_node.h>
 
+class PTNode;
+
 class ParserContext
 {
 public:

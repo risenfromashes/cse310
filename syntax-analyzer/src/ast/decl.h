@@ -3,10 +3,11 @@
 #include "ast/ast_node.h"
 #include "ast/ast_visitor.h"
 #include "ast/type.h"
-#include "parser_context.h"
 
 #include <memory>
 #include <vector>
+
+class ParserContext;
 
 class Stmt;
 
@@ -27,8 +28,8 @@ class VarDecl : public Decl
 public:
   VarDecl(Location loc, Type *type, std::string name);
 
-  static std::unique_ptr<Decl> create(ParserContext *context, Location loc, Type *type,
-                                      std::string name);
+  static std::unique_ptr<VarDecl> create(ParserContext *context, Location loc, Type *type,
+                                         std::string name);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_var_decl(this); }
 
@@ -43,8 +44,8 @@ class ParamDecl : public Decl
 public:
   ParamDecl(Location loc, Type *type, std::string name);
 
-  static std::unique_ptr<Decl> create(ParserContext *context, Location loc, Type *type,
-                                      std::string name);
+  static std::unique_ptr<ParamDecl> create(ParserContext *context, Location loc, Type *type,
+                                           std::string name);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_param_decl(this); }
 
@@ -61,9 +62,9 @@ public:
            std::vector<std::unique_ptr<ParamDecl>> params, std::string name,
            CompoundStmt *defintion);
 
-  static std::unique_ptr<Decl> create(ParserContext *context, Location loc, Type *ret_type,
-                                      std::vector<std::unique_ptr<ParamDecl>> params,
-                                      std::string name, std::unique_ptr<CompoundStmt> definition = nullptr);
+  static std::unique_ptr<FuncDecl> create(ParserContext *context, Location loc, Type *ret_type,
+                                          std::vector<std::unique_ptr<ParamDecl>> params,
+                                          std::string name, std::unique_ptr<CompoundStmt> definition = nullptr);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_func_decl(this); }
 
@@ -87,8 +88,8 @@ class TranslationUnitDecl : public ASTNode
 public:
   TranslationUnitDecl(Location loc, std::vector<std::unique_ptr<Decl>> decls);
 
-  static std::unique_ptr<Decl> create(ParserContext *context, Location loc,
-                                      std::vector<std::unique_ptr<Decl>> decls);
+  static std::unique_ptr<TranslationUnitDecl> create(ParserContext *context, Location loc,
+                                                     std::vector<std::unique_ptr<Decl>> decls);
 
   const std::vector<std::unique_ptr<Decl>> &decl_units() { return decl_units_; }
 
