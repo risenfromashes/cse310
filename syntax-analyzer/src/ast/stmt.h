@@ -8,6 +8,8 @@
 #include <memory>
 #include <vector>
 
+class Expr;
+
 class Stmt : public ASTNode {
 public:
   Stmt(Location loc);
@@ -21,6 +23,8 @@ public:
 
   // can be null
   Expr *expr() { return expr_.get(); }
+
+  void visit(ASTVisitor *visitor) override { visitor->visit_expr_stmt(this); }
 
 private:
   std::unique_ptr<Expr> expr_;
@@ -37,6 +41,8 @@ public:
     return var_decls_;
   }
 
+  void visit(ASTVisitor *visitor) override { visitor->visit_decl_stmt(this); }
+
 private:
   std::vector<std::unique_ptr<VarDecl>> var_decls_;
 };
@@ -45,10 +51,13 @@ private:
 class CompoundStmt : public Stmt {
 public:
   CompoundStmt(Location loc, std::vector<std::unique_ptr<Stmt>> stmts);
-  void visit(ASTVisitor *visitor) override;
 
   static Stmt *create(ParserContext *context, Location loc,
                       std::vector<std::unique_ptr<Stmt>> stmts);
+
+  void visit(ASTVisitor *visitor) override {
+    visitor->visit_compound_stmt(this);
+  }
 
 private:
   std::vector<std::unique_ptr<Stmt>> stmts_;
@@ -61,7 +70,7 @@ public:
   static Stmt *create(ParserContext *context, Location loc, ASTNode *condition,
                       ASTNode *if_case, ASTNode *else_case);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_if_stmt(this); }
 
 private:
   std::unique_ptr<Expr> condition_;
@@ -76,7 +85,7 @@ public:
   static Stmt *create(ParserContext *context, Location loc, ASTNode *cond,
                       ASTNode *body);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_while_stmt(this); }
 
   Expr *condition() { return condition_.get(); }
   Stmt *body() { return body_.get(); }
@@ -93,7 +102,7 @@ public:
   static Stmt *create(ParserContext *context, Location loc, ASTNode *init,
                       ASTNode *loop, ASTNode *incr);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_for_stmt(this); }
 
   ExprStmt *init_expr() { return init_.get(); }
   ExprStmt *loop_condition() { return condition_.get(); }
@@ -111,7 +120,7 @@ public:
 
   static Stmt *create(ParserContext *context, Location loc, Expr *expr);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_return_stmt(this); }
 
   Expr *expr() { return expr_.get(); }
 

@@ -26,7 +26,7 @@ public:
   static Decl *create(ParserContext *context, Location loc, Type *type,
                       std::string name);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_var_decl(this); }
 
   std::string_view name() { return name_; }
 
@@ -41,7 +41,7 @@ public:
   static Decl *create(ParserContext *context, Location loc, Type *type,
                       std::string name);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_param_decl(this); }
 
   std::string_view name() { return name_; }
 
@@ -59,12 +59,13 @@ public:
                       std::vector<std::unique_ptr<ParamDecl>> params,
                       std::string name, CompoundStmt *definition = nullptr);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_func_decl(this); }
 
   std::string_view name() { return name_; }
   FuncType *func_type() { return type_.get(); }
   Type *return_type() { return type_->return_type(); }
 
+  /* can be null */
   CompoundStmt *definition() { return definition_; }
   const std::vector<std::unique_ptr<ParamDecl>> &params() { return params_; }
 

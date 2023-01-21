@@ -1,11 +1,12 @@
 #pragma once
 
-#include "ast/ast_visitor.h"
 #include "log.h"
 #include <iostream>
 #include <string>
 
 enum class SymbolType { VAR, FUNC, PARAM };
+
+class Decl;
 
 class SymbolInfo {
 

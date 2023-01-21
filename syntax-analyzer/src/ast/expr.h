@@ -9,6 +9,7 @@
 #include <optional>
 #include <vector>
 
+class Decl;
 class Token;
 class ParserContext;
 
@@ -76,6 +77,10 @@ public:
   void add_child(ASTNode *node);
   void add_child(std::unique_ptr<ASTNode> node);
 
+  void visit(ASTVisitor *visitor) override {
+    visitor->visit_recovery_expr(this);
+  }
+
 private:
   Type *determine_type(ParserContext *context) { return nullptr; }
   ValueType determine_value_type() { return ValueType::RVALUE; }
@@ -90,7 +95,7 @@ public:
   static Expr *create(ParserContext *context, Location loc, UnaryOp op,
                       ASTNode *operand);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_unary_expr(this); }
 
   Expr *operand() { return operand_.get(); }
   UnaryOp op() { return op_; }
@@ -115,7 +120,7 @@ public:
   Expr *right_operand() { return roperand_.get(); }
   BinaryOp op() { return op_; }
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_binary_expr(this); }
 
 private:
   Type *determine_type(ParserContext *context);
@@ -135,7 +140,7 @@ public:
 
   Decl *decl() { return decl_; }
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_ref_expr(this); }
 
 private:
   Type *determine_type(ParserContext *context);
@@ -152,7 +157,7 @@ public:
   static Expr *create(ParserContext *context, Location loc, ASTNode *callee,
                       std::vector<std::unique_ptr<Expr>> arguments);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override { visitor->visit_call_expr(this); }
 
   Expr *callee() { return callee_.get(); }
   FuncType *func_type() { return func_type_; }
@@ -176,7 +181,9 @@ public:
   static Expr *create(ParserContext *context, Location loc, ASTNode *arr,
                       ASTNode *subscript);
 
-  void visit(ASTVisitor *visitor) override;
+  void visit(ASTVisitor *visitor) override {
+    visitor->visit_array_subscript_expr(this);
+  }
 
   Expr *array() { return array_; }
   Expr *subscript() { return subscript_; }
@@ -196,6 +203,8 @@ public:
 
   int value() { return value_; }
 
+  void visit(ASTVisitor *visitor) override { visitor->visit_int_literal(this); }
+
 private:
   Type *determine_type(ParserContext *context);
   ValueType determine_value_type();
@@ -209,6 +218,10 @@ public:
 
   int value() { return value_; }
 
+  void visit(ASTVisitor *visitor) override {
+    visitor->visit_char_literal(this);
+  }
+
 private:
   Type *determine_type(ParserContext *context);
   ValueType determine_value_type();
@@ -221,6 +234,10 @@ public:
   Expr *create(ParserContext *context, Location loc, Token *tok);
 
   double value() { return value_; }
+
+  void visit(ASTVisitor *visitor) override {
+    visitor->visit_float_literal(this);
+  }
 
 private:
   Type *determine_type(ParserContext *context);

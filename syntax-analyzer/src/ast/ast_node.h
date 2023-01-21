@@ -11,7 +11,7 @@ public:
 
   Location &location() { return loc_; }
 
-  virtual void visit(ASTVisitor *visitor);
+  virtual void visit(ASTVisitor *visitor) = 0;
 
 protected:
   Location loc_;
