@@ -12,23 +12,20 @@ class Token {
 public:
   using Type = int;
 
-  Token(Type type);
-  Token(Type type, std::string &&str);
-  Token(Type type, std::string_view str);
+  Token(int line, Type type, std::string &&str);
 
   Type type() const { return type_; }
 
-  std::optional<std::string_view> value() { return value_; }
-  std::string move_value() {
-    assert(value_);
-    return std::move(value_.value());
-  }
+  std::string value() { return value_; }
 
   const char *type_str() const;
 
+  int line() { return line_; }
+
 private:
   Type type_;
-  std::optional<std::string> value_;
+  std::string value_;
+  int line_;
 };
 
 inline bool is_comment(Token::Type type) {

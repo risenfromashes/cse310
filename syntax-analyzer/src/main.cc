@@ -9,8 +9,7 @@
 #include "parser_context.h"
 #include "symbol_table.h"
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   // int8_t i = -128;
   // int8_t j = 3 - i;
   // const char *in_file = "../sample_input.txt";
@@ -31,16 +30,18 @@ int main(int argc, char **argv)
 
   // Logger<0>::set_out_file(log_file);
   // Logger<1>::set_out_file(out_file);
+  const char *in_file = "../noerror.c";
 
-  std::FILE *in = std::fopen("../sample.c", "r");
+  std::FILE *in = std::fopen(in_file, "r");
 
-  if (in)
-  {
+  if (in) {
     ParserContext context(in);
+    context.set_ast_logger_file("ast.txt");
+    context.set_pt_logger_file("pt.txt");
+    context.set_logger_file("log.txt");
+    context.set_error_logger_file("err.txt");
     context.parse();
+  } else {
+    fmt::print(stderr, "Couldn't access input file: {}", in_file);
   }
-  // else
-  // {
-  //   fmt::print(stderr, "Couldn't access input file: {}", in_file);
-  // }
 }

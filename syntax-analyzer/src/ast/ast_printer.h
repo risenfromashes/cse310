@@ -2,6 +2,7 @@
 
 #include "ast/ast_node.h"
 #include "ast/ast_visitor.h"
+#include "ast/decl.h"
 #include "parser_context.h"
 
 class ASTPrinter : public ASTVisitor {
@@ -34,6 +35,8 @@ public:
   void visit_int_literal(IntLiteral *int_literal) override;
   void visit_char_literal(CharLiteral *char_literal) override;
   void visit_float_literal(FloatLiteral *float_literal) override;
+
+  void visit_translation_unit_decl(TranslationUnitDecl *trans_decl) override;
 
   void enter() { depth_++; }
   void exit() { depth_--; }

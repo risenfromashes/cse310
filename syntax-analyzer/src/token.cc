@@ -4,13 +4,8 @@
 
 #include <parser.tab.h>
 
-Token::Token(Type type) : type_(type) {}
-
-Token::Token(Type type, std::string &&str)
-    : type_(type), value_(std::move(str)) {}
-
-Token::Token(Type type, std::string_view str)
-    : type_(type), value_(std::string(str)) {}
+Token::Token(int line, Type type, std::string &&str)
+    : line_(line), type_(type), value_(std::move(str)) {}
 
 const char *Token::type_str() const {
   static bool init = false;

@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cassert>
 #include <concepts>
 #include <memory>
 #include <string_view>
 #include <variant>
 #include <vector>
 
+#include "log.h"
 #include "token.h"
 
 #include "ast/ast_visitor.h"
@@ -22,99 +24,126 @@ using ParamDecls = std::vector<std::unique_ptr<ParamDecl>>;
 using Exprs = std::vector<std::unique_ptr<Expr>>;
 using Decls = std::vector<std::unique_ptr<Decl>>;
 
-struct PTNode
-{
+class PTNode {
 public:
   PTNode(std::string_view name);
   virtual ~PTNode() = default;
 
-  virtual void print(ParserContext *context) = 0;
+  virtual void print(ParserContext *context, int depth) = 0;
+  std::string_view name() { return name_; }
 
 private:
   std::string_view name_;
 };
 
-class Terminal : public PTNode
-{
+class Terminal : public PTNode {
 public:
   Terminal(Token *token);
   ~Terminal();
-  void print(ParserContext *context) override;
+  void print(ParserContext *context, int depth) override;
 
 private:
   Token *token_;
 };
 
-class NonTerminal : public PTNode
-{
+class NonTerminal : public PTNode {
 public:
-  NonTerminal(std::string_view name);
+  NonTerminal(Location loc, std::string_view name);
   ~NonTerminal();
 
-  static NonTerminal *create(std::string_view name, auto &&...child);
+  static NonTerminal *create(ParserContext *context, Location location,
+                             std::string_view name, auto &&...child);
 
-  void print(ParserContext *context) override;
+  void print(ParserContext *context, int depth) override;
 
   void add_child(PTNode *child);
   void add_children(auto &&child, auto &&...other);
 
-  Type *type() { return std::get<Type *>(ast); }
+  void print_rule(ParserContext *context, bool newline = false);
+  void print_rule(Logger *logger, bool newline = false);
 
-  std::unique_ptr<Stmt> &stmt()
-  {
+  Type *type() {
+    assert(std::holds_alternative<Type *>(ast));
+    return std::get<Type *>(ast);
+  }
+
+  std::unique_ptr<Stmt> &stmt() {
+    assert(std::holds_alternative<std::unique_ptr<Stmt>>(ast));
     return std::get<std::unique_ptr<Stmt>>(ast);
   }
-  std::unique_ptr<CompoundStmt> &compound_stmt()
-  {
-    return std::get<std::unique_ptr<CompoundStmt>>(ast);
-  }
-  std::unique_ptr<Decl> &decl()
-  {
+
+  std::unique_ptr<Decl> &decl() {
+    assert(std::holds_alternative<std::unique_ptr<Decl>>(ast));
     return std::get<std::unique_ptr<Decl>>(ast);
   }
-  std::unique_ptr<Expr> &expr()
-  {
+
+  std::unique_ptr<Expr> &expr() {
+    assert(std::holds_alternative<std::unique_ptr<Expr>>(ast));
     return std::get<std::unique_ptr<Expr>>(ast);
   }
 
-  Stmts &stmts() { return std::get<Stmts>(ast); }
-  VarDecls &vardecls() { return std::get<VarDecls>(ast); }
-  ParamDecls &paramdecls() { return std::get<ParamDecls>(ast); }
-  Exprs &exprs() { return std::get<Exprs>(ast); }
-  Decls &decls() { return std::get<Decls>(ast); }
+  Stmts &stmts() {
+    Logger logger;
+    print_rule(&logger, true);
+    assert(std::holds_alternative<Stmts>(ast));
+    return std::get<Stmts>(ast);
+  }
 
-  std::variant<
-      std::unique_ptr<Expr>,
-      std::unique_ptr<Stmt>,
-      std::unique_ptr<CompoundStmt>,
-      std::unique_ptr<Decl>,
-      Type *, Stmts, VarDecls, ParamDecls,
-      Exprs, Decls>
+  VarDecls &vardecls() {
+    Logger logger;
+    print_rule(&logger, true);
+    assert(std::holds_alternative<VarDecls>(ast));
+    return std::get<VarDecls>(ast);
+  }
+
+  ParamDecls &paramdecls() {
+    Logger logger;
+    print_rule(&logger, true);
+    assert(std::holds_alternative<ParamDecls>(ast));
+    return std::get<ParamDecls>(ast);
+  }
+
+  Exprs &exprs() {
+    Logger logger;
+    print_rule(&logger, true);
+    assert(std::holds_alternative<Exprs>(ast));
+    return std::get<Exprs>(ast);
+  }
+
+  Decls &decls() {
+    assert(std::holds_alternative<Decls>(ast));
+    return std::get<Decls>(ast);
+  }
+
+  std::variant<std::unique_ptr<Expr>, std::unique_ptr<Stmt>,
+               std::unique_ptr<Decl>, Type *, Stmts, VarDecls, ParamDecls,
+               Exprs, Decls>
       ast;
+
+  Location &location() { return location_; }
 
 private:
   std::vector<std::unique_ptr<PTNode>> children_;
+  Location location_;
 };
 
-NonTerminal *NonTerminal::create(std::string_view name, auto &&...children)
-{
-  NonTerminal *ret = new NonTerminal(name);
-  ret->add_children(std::forward<decltype(children)>(children)...);
+NonTerminal *NonTerminal::create(ParserContext *context, Location location,
+                                 std::string_view name, auto &&...children) {
+  NonTerminal *ret = new NonTerminal(location, name);
+  if constexpr (sizeof...(children) > 0) {
+    ret->add_children(std::forward<decltype(children)>(children)...);
+  }
+  ret->print_rule(context, true);
   return ret;
 }
 
-void NonTerminal::add_children(auto &&child, auto &&...other)
-{
-  if constexpr (std::convertible_to<decltype(child), Token *>)
-  {
+void NonTerminal::add_children(auto &&child, auto &&...other) {
+  if constexpr (std::convertible_to<decltype(child), Token *>) {
     add_child(new Terminal(child));
-  }
-  else
-  {
+  } else {
     add_child(child);
   }
-  if constexpr (sizeof...(other) > 0)
-  {
+  if constexpr (sizeof...(other) > 0) {
     add_children(std::forward<decltype(other)>(other)...);
   }
 }

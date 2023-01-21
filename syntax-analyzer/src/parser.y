@@ -48,7 +48,8 @@ void lyyerror(YYLTYPE t, char *s, ...);
 %type <non_term> program unit var_declaration func_declaration func_definition type_specifier 
 %type <non_term> parameter_list compound_statement statements declaration_list statement 
 %type <non_term> expression expression_statement logic_expression rel_expression simple_expression
-%type <non_term> term unary_expression factor variable argument_list arguments lcurl
+%type <non_term> term unary_expression factor variable argument_list arguments 
+%type <token>    lcurl
 
 
 
@@ -59,7 +60,7 @@ void lyyerror(YYLTYPE t, char *s, ...);
 %%
 
 start : program {
-    $$ = NonTerminal::create("start", $1);
+    $$ = NonTerminal::create(context, @$, "start", $1);
     auto root = TranslationUnitDecl::create(context, @$, std::move($1->decls()));
     context->set_ast_root(std::move(root));
     context->set_pt_root($$);
@@ -67,87 +68,93 @@ start : program {
 	;
 
 program : program unit {
-    $$ = NonTerminal::create("program", $1, $2);
-    $$->ast = std::move($$->ast);
+    $$ = NonTerminal::create(context, @$, "program", $1, $2);
+    $$->ast = std::move($1->ast);
     auto& t = $$->decls();
     auto& f = $1->decls();
     std::move(f.begin(), f.end(), std::back_inserter(t));
   } 
 	| unit {
-    $$ = NonTerminal::create("program", $1);
+    $$ = NonTerminal::create(context, @$, "program", $1);
     $$->ast = std::move($1->ast);
   }
 	;
 	
 unit : var_declaration {
-        $$ = NonTerminal::create("unit", $1);
+        $$ = NonTerminal::create(context, @$, "unit", $1);
         $$->ast = Decls();
         for(auto& v: $1->vardecls()){
           $$->decls().push_back(std::move(v));
         }
      }
      | func_declaration {
-        $$ = NonTerminal::create("unit", $1);
+        $$ = NonTerminal::create(context, @$, "unit", $1);
         $$->ast = Decls(); 
         $$->decls().push_back(std::move($1->decl()));
      }
      | func_definition { 
-        $$ = NonTerminal::create("unit", $1);
+        $$ = NonTerminal::create(context, @$, "unit", $1);
         $$->ast = Decls{}; 
         $$->decls().push_back(std::move($1->decl()));
      }
      ;
      
 func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
-        $$ = NonTerminal::create("func_declaration", $1, $2, $3, $4, $5, $6);
-        $$->ast = FuncDecl::create(context, @$, $1->type(), 
+        $$ = NonTerminal::create(context, @$, "func_declaration", $1, $2, $3, $4, $5, $6);
+        $$->ast = FuncDecl::create(context, @$, $1->type(),
                                     std::move($4->paramdecls()),
-                                    $2->move_value(), nullptr);
+                                    $2->value(), nullptr);
+        
         /* no declaration to follow */
         context->current_params(nullptr);
     }
 		| type_specifier ID LPAREN RPAREN SEMICOLON {
-        $$ = NonTerminal::create("func_declaration", $1, $2, $3, $4, $5);
+        $$ = NonTerminal::create(context, @$, "func_declaration", $1, $2, $3, $4, $5);
         $$->ast = FuncDecl::create(context, @$, $1->type(), 
                                     ParamDecls(),
-                                    $2->move_value(), nullptr);
+                                    $2->value(), nullptr);
         /* no declaration to follow */
         context->current_params(nullptr);
     }
 		;
 		 
 func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement {
-        $$ = NonTerminal::create("func_definition", $1, $2, $3, $4, $5, $6);
+        $$ = NonTerminal::create(context, @$, "func_definition", $1, $2, $3, $4, $5, $6);
         $$->ast = FuncDecl::create(context, @$, $1->type(), 
                                     std::move($4->paramdecls()),
-                                    $2->move_value(), std::move($6->compound_stmt()));
+                                    $2->value(), std::move($6->stmt()));
     }
 		| type_specifier ID LPAREN RPAREN compound_statement {
-        $$ = NonTerminal::create("func_definition", $1, $2, $3, $4, $5);
+        $$ = NonTerminal::create(context, @$, "func_definition", $1, $2, $3, $4, $5);
+        std::cout << $5->location().start_line() << std::endl;
         $$->ast = FuncDecl::create(context, @$, $1->type(), 
                                     ParamDecls(),
-                                    $2->move_value(), std::move($5->compound_stmt()));
+                                    $2->value(), std::move($5->stmt())); 
     }
  		;				
 
 
 parameter_list  : parameter_list COMMA type_specifier ID {
-        $$ = NonTerminal::create("parameter_list", $1, $2, $3, $4);
+        $$ = NonTerminal::create(context, @$, "parameter_list", $1, $2, $3, $4);
+        $$->ast = std::move($1->ast);
         $$->paramdecls().push_back(ParamDecl::create(context, @$, $3->type(), 
-                                      $4->move_value()));
+                                      $4->value()));
+        context->current_params(&$$->paramdecls());
     }
 		| parameter_list COMMA type_specifier {
-        $$ = NonTerminal::create("parameter_list", $1, $2, $3);
+        $$ = NonTerminal::create(context, @$, "parameter_list", $1, $2, $3);
+        $$->ast = std::move($1->ast);
         $$->paramdecls().push_back(ParamDecl::create(context, @$, $3->type(), ""));
+        context->current_params(&$$->paramdecls());
     }
  		| type_specifier ID {
-        $$ = NonTerminal::create("parameter_list", $1, $2);
+        $$ = NonTerminal::create(context, @$, "parameter_list", $1, $2);
         $$->ast = ParamDecls();
-        $$->paramdecls().push_back(ParamDecl::create(context, @$, $1->type(), $2->move_value()));
+        $$->paramdecls().push_back(ParamDecl::create(context, @$, $1->type(), $2->value()));
         context->current_params(&$$->paramdecls());
     }
 		| type_specifier {
-        $$ = NonTerminal::create("parameter_list", $1);
+        $$ = NonTerminal::create(context, @$, "parameter_list", $1);
         $$->ast = ParamDecls();
         $$->paramdecls().push_back(ParamDecl::create(context, @$, $1->type(), ""));
         context->current_params(&$$->paramdecls());
@@ -155,155 +162,283 @@ parameter_list  : parameter_list COMMA type_specifier ID {
  		;
 
  		
-compound_statement : LCURL statements RCURL {
-          $$ = NonTerminal::create("compound_statement", $1, $2, $3);
-          $$->ast = CompoundStmt::create(context, @$, std::move($$->stmts()));
+compound_statement : lcurl statements RCURL {
+          $$ = NonTerminal::create(context, @$, "compound_statement", $1, $2, $3);
+          $$->ast = CompoundStmt::create(context, @$, std::move($2->stmts()));
           context->exit_scope();
         }
- 		    | LCURL RCURL {
-          $$ = NonTerminal::create("compound_statement", $1, $2);
-          $$->ast = CompoundStmt::create(context, @$, std::move($$->stmts()));
+ 		    | lcurl RCURL {
+          $$ = NonTerminal::create(context, @$, "compound_statement", $1, $2);
+          $$->ast = CompoundStmt::create(context, @$, Stmts());
           context->exit_scope();
         }
  		    ;
  		    
 var_declaration : type_specifier declaration_list SEMICOLON {
-          $$ = NonTerminal::create("var_declaration", $1, $2, $3);
-          $$->ast = std::move($$->ast);
+          $$ = NonTerminal::create(context, @$, "var_declaration", $1, $2, $3);
+          $$->ast = std::move($2->ast);
      }
  		 ;
  		 
 type_specifier	: INT { 
-			$$ = NonTerminal::create("type_specifier", $1); 
+			$$ = NonTerminal::create(context, @$, "type_specifier", $1); 
 			$$->ast = context->get_built_in_type(BuiltInTypeName::INT);
       context->current_type($$->type());
 		}
  		| FLOAT {
-			$$ = NonTerminal::create("type_specifier", $1); 
+			$$ = NonTerminal::create(context, @$, "type_specifier", $1); 
 			$$->ast = context->get_built_in_type(BuiltInTypeName::FLOAT);
       context->current_type($$->type());
 		}
  		| VOID {
-			$$ = NonTerminal::create("type_specifier", $1); 
+			$$ = NonTerminal::create(context, @$, "type_specifier", $1); 
 			$$->ast = context->get_built_in_type(BuiltInTypeName::VOID);
       context->current_type($$->type());
 		}
  		;
  		
 declaration_list : declaration_list COMMA ID {
-          $$ = NonTerminal::create("declaration_list", $1, $2, $3);
-          $$->vardecls().push_back(
-              VarDecl::create(context, @3, context->current_type(), $3->move_value())
+          $$ = NonTerminal::create(context, @$, "declaration_list", $1, $2, $3);
+          $$->ast = std::move($1->ast);
+          $1->vardecls().push_back(
+              VarDecl::create(context, @3, context->current_type(), $3->value())
           );
       }
  		  | declaration_list COMMA ID LSQUARE CONST_INT RSQUARE {
-          $$ = NonTerminal::create("declaration_list", $1, $2, $3, $4, $5, $6);
-          size_t size = std::atoi($5->value()->data());
+          $$ = NonTerminal::create(context, @$, "declaration_list", $1, $2, $3, $4, $5, $6);
+          size_t size = std::atoi($5->value().c_str());
           auto type = context->current_type()->array_type()->sized_array(size);
+          $$->ast = std::move($1->ast);
           $$->vardecls().push_back(
-              VarDecl::create(context, @3, type, $3->move_value()));
+              VarDecl::create(context, @3, type, $3->value()));
       }
  		  | ID {
-          $$ = NonTerminal::create("declaration_list", $1);
+          $$ = NonTerminal::create(context, @$, "declaration_list", $1);
           $$->ast = VarDecls{};
           $$->vardecls().push_back(
-              VarDecl::create(context, @$, context->current_type(), $1->move_value()));
+              VarDecl::create(context, @$, context->current_type(), $1->value()));
       }
  		  | ID LSQUARE CONST_INT RSQUARE {
-          $$ = NonTerminal::create("declaration_list", $1, $2, $3, $4);
+          $$ = NonTerminal::create(context, @$, "declaration_list", $1, $2, $3, $4);
           $$->ast = VarDecls{};
-          size_t size = std::atoi($3->value()->data());
+          size_t size = std::atoi($3->value().c_str());
           auto type = context->current_type()->array_type()->sized_array(size);
           $$->vardecls().push_back(
-              VarDecl::create(context, @3, type, $1->move_value()));
+              VarDecl::create(context, @3, type, $1->value()));
       }
  		  ;
  		  
 statements : statement {
-          $$ = NonTerminal::create("statements", $1);
+          $$ = NonTerminal::create(context, @$, "statements", $1);
           $$->ast = Stmts{};
           $$->stmts().push_back(std::move($1->stmt()));
       }
 	   | statements statement {
-          $$ = NonTerminal::create("statements", $1, $2);
+          $$ = NonTerminal::create(context, @$, "statements", $1, $2);
           $$->ast = std::move($1->ast);
           $$->stmts().push_back(std::move($2->stmt()));
      }
 	   ;
 	   
-statement : var_declaration 
-	  | expression_statement
-	  | compound_statement {
-          $$ = NonTerminal::create("statement", $1);
+statement : var_declaration {
+          $$ = NonTerminal::create(context, @$, "statement", $1);
+          $$->ast = DeclStmt::create(context, @$, std::move($1->vardecls()));
+    } 
+	  | expression_statement {
+          $$ = NonTerminal::create(context, @$, "statement", $1);
           $$->ast = std::move($1->ast);
     }
-	  | FOR LPAREN expression_statement expression_statement expression RPAREN statement
-	  | IF LPAREN expression RPAREN statement %prec UNMATCHED_ELSE {}
-	  | IF LPAREN expression RPAREN statement ELSE statement
-	  | WHILE LPAREN expression RPAREN statement
+	  | compound_statement {
+          $$ = NonTerminal::create(context, @$, "statement", $1);
+          $$->ast = std::move($1->ast);
+    }
+	  | FOR LPAREN expression_statement expression_statement expression RPAREN statement {
+          $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3, $4, $5, $6, $7);
+          $$->ast = ForStmt::create(context, @$, std::move($3->expr()), std::move($4->expr()), 
+                                      std::move($5->expr()));
+    }
+	  | IF LPAREN expression RPAREN statement %prec UNMATCHED_ELSE {
+          $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3, $4, $5);
+          $$->ast = IfStmt::create(context, @$, std::move($3->expr()), std::move($5->stmt())
+                                              , nullptr);
+    }
+	  | IF LPAREN expression RPAREN statement ELSE statement {
+          $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3, $4, $5, $6, $7);
+          $$->ast = IfStmt::create(context, @$, std::move($3->expr()), std::move($5->stmt())
+                                              , std::move($7->stmt()));
+    }
+	  | WHILE LPAREN expression RPAREN statement {
+          $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3, $4, $5);
+          $$->ast = WhileStmt::create(context, @$, std::move($3->expr()), std::move($5->stmt()));
+    }
 	  /* | PRINTLN LPAREN ID RPAREN SEMICOLON */
-	  | RETURN expression SEMICOLON
+	  | RETURN expression SEMICOLON {
+          $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3);
+          $$->ast = ReturnStmt::create(context, @$, std::move($2->expr()));
+    }
 	  ;
 	  
-expression_statement 	: SEMICOLON			
-			| expression SEMICOLON 
+expression_statement 	: SEMICOLON	{
+          $$ = NonTerminal::create(context, @$, "expression_statement", $1);
+          $$->ast = ExprStmt::create(context, @$, nullptr);
+      }
+			| expression SEMICOLON {
+          $$ = NonTerminal::create(context, @$, "expression_statement", $1, $2);
+          $$->ast = ExprStmt::create(context, @$, std::move($1->expr()));
+      }
 			;
 	  
-variable : ID 		
-	 | ID LSQUARE expression RSQUARE 
+variable : ID {
+      $$ = NonTerminal::create(context, @$, "variable", $1);
+      $$->ast = RefExpr::create(context, @$, $1);
+   }
+	 | ID LSQUARE expression RSQUARE {
+      $$ = NonTerminal::create(context, @$, "variable", $1, $2, $3, $4);
+      auto ref = RefExpr::create(context, @1, $1);
+      $$->ast = ArraySubscriptExpr::create(context, @$, std::move(ref), std::move($3->expr()));
+   } 
 	 ;
 	 
- expression : logic_expression	
-	   | variable ASSIGNOP logic_expression 	
+ expression : logic_expression	{
+      $$ = NonTerminal::create(context, @$, "expression", $1);
+      $$->ast = std::move($1->ast);
+      }
+	   | variable ASSIGNOP logic_expression {
+      $$ = NonTerminal::create(context, @$, "expression", $1, $2, $3);
+      $$->ast = BinaryExpr::create(context, @$, BinaryOp::ASSIGN, std::move($1->expr())
+                                              , std::move($3->expr()));
+     } 	
 	   ;
 			
-logic_expression : rel_expression 	
-		 | rel_expression LOGICOP rel_expression 	
+logic_expression : rel_expression 	{
+      $$ = NonTerminal::create(context, @$, "logic_expression", $1);
+      $$->ast = std::move($1->ast);
+      }
+		 | rel_expression LOGICOP rel_expression 	{
+      $$ = NonTerminal::create(context, @$, "logic_expression", $1, $2, $3);
+      auto op = $2->value() == "&&" ? BinaryOp::LOGIC_AND : BinaryOp::LOGIC_OR;
+      $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
+                                              , std::move($3->expr()));
+     }
 		 ;
 			
-rel_expression	: simple_expression 
-		| simple_expression RELOP simple_expression	
+rel_expression	: simple_expression {
+      $$ = NonTerminal::create(context, @$, "rel_expression", $1);
+      $$->ast = std::move($1->ast);
+    }
+		| simple_expression RELOP simple_expression	{
+
+      $$ = NonTerminal::create(context, @$, "rel_expression", $1, $2, $3);
+      auto op = get_relop($2->value());
+      $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
+                                              , std::move($3->expr()));
+    }
 		;
 				
-simple_expression : term 
-		  | simple_expression ADDOP term 
+simple_expression : term {
+        $$ = NonTerminal::create(context, @$, "simple_expression", $1);
+        $$->ast = std::move($1->ast);
+      }
+		  | simple_expression ADDOP term {
+        $$ = NonTerminal::create(context, @$, "simple_expression", $1, $2, $3);
+        auto op = $2->value() == "+" ? BinaryOp::ADD : BinaryOp::SUB;
+        $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
+                                              , std::move($3->expr()));
+      } 
 		  ;
 					
-term :	unary_expression
-     |  term MULOP unary_expression
+term :	unary_expression {
+        $$ = NonTerminal::create(context, @$, "term", $1);
+        $$->ast = std::move($1->ast);
+      }
+     |  term MULOP unary_expression {
+        $$ = NonTerminal::create(context, @$, "term", $1, $2, $3);
+        auto op = $2->value() == "*" ? BinaryOp::MUL : BinaryOp::DIV;
+        $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
+                                              , std::move($3->expr()));
+     }  
      ;
 
-unary_expression : ADDOP unary_expression  
-		 | NOT unary_expression 
-		 | factor 
+unary_expression : ADDOP unary_expression  {
+        $$ = NonTerminal::create(context, @$, "unary_expression", $1, $2);
+        auto op = $1->value() == "+" ? UnaryOp::PLUS : UnaryOp::MINUS;
+        $$->ast = UnaryExpr::create(context, @$, op, std::move($2->expr()));
+      }
+		 | NOT unary_expression {
+        $$ = NonTerminal::create(context, @$, "unary_expression", $1);
+        $$->ast = UnaryExpr::create(context, @$, UnaryOp::LOGIC_NOT, std::move($2->expr()));
+     } 
+		 | factor {
+        $$ = NonTerminal::create(context, @$, "unary_expression", $1);
+        $$->ast = std::move($1->ast);
+     } 
 		 ;
 	
-factor	: variable 
-	| ID LPAREN argument_list RPAREN
-	| LPAREN expression RPAREN
-	| CONST_INT 
-	| CONST_FLOAT
-	| variable INCOP 
-	| variable DECOP
+factor	: variable {
+      $$ = NonTerminal::create(context, @$, "factor", $1);
+      $$->ast = std::move($1->expr());
+  }
+	| ID LPAREN argument_list RPAREN {
+      $$ = NonTerminal::create(context, @$, "factor", $1, $2, $3, $4);
+      auto ref = RefExpr::create(context, @1, $1);
+      $$->ast = CallExpr::create(context, @$, std::move(ref), std::move($3->exprs()));
+  }
+	| LPAREN expression RPAREN {
+      $$ = NonTerminal::create(context, @$, "factor", $1, $2, $3);
+      $$->ast = std::move($2->expr());
+  }
+	| CONST_INT {
+      $$ = NonTerminal::create(context, @$, "factor", $1);
+      $$->ast = IntLiteral::create(context, @$, $1);
+  }
+	| CONST_FLOAT {
+      $$ = NonTerminal::create(context, @$, "factor", $1);
+      $$->ast = FloatLiteral::create(context, @$, $1);
+  }
+	| variable INCOP {
+      $$ = NonTerminal::create(context, @$, "factor", $1, $2);
+      $$->ast = UnaryExpr::create(context, @$, UnaryOp::POST_INC, std::move($1->expr()));
+  }
+	| variable DECOP {
+      $$ = NonTerminal::create(context, @$, "factor", $1, $2);
+      $$->ast = UnaryExpr::create(context, @$, UnaryOp::POST_DEC, std::move($1->expr()));
+  }
 	;
 	
-argument_list : arguments
-			  |
+argument_list : arguments {
+            $$ = NonTerminal::create(context, @$, "argument_list", $1);
+            $$->ast = std::move($1->exprs());
+        }
+			  | {
+            $$ = NonTerminal::create(context, @$, "argument_list");
+            $$->ast = Exprs{};
+        }
 			  ;
 	
-arguments : arguments COMMA logic_expression
-	      | logic_expression
+arguments : arguments COMMA logic_expression {
+            $$ = NonTerminal::create(context, @$, "arguments", $1, $2, $3);
+            $$->ast = std::move($1->ast);
+            $$->exprs().push_back(std::move($3->expr()));
+        }
+	      | logic_expression {
+            $$ = NonTerminal::create(context, @$, "arguments", $1);
+            $$->ast = Exprs{};
+            $$->exprs().push_back(std::move($1->expr()));
+        }
 	      ;
  
  lcurl	: LCURL {
+      $$ = $1;
       context->enter_scope();
+      std::cout << "current params: " << context->current_params() << std::endl;
       if (context->current_params()){
+        std::cout << "Entering parameters" << std::endl;
         for(auto& param : *context->current_params()){
           if (param->name() == ""){
             context->report_error(param->location(), "Nameless param");
             continue;
           }	
-          if (!context->insert_symbol(param->name(), SymbolType::PARAM, param->decl())){
+          if (!context->insert_symbol(param->name(), SymbolType::PARAM, param.get())){
             context->report_error(param->location(), "Param redefinition");
           }
         }

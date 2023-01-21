@@ -24,6 +24,7 @@ public:
   SymbolInfo *look_up(std::string_view name);
 
   ScopeTable *current_scope() { return current_scope_; }
+  ScopeTable *global_scope() { return global_scope_; }
 
   /* print current scope */
   void log_current_scope();
@@ -37,4 +38,5 @@ private:
 
   std::allocator<ScopeTable> allocator_;
   ScopeTable *current_scope_;
+  ScopeTable *global_scope_;
 };

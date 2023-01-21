@@ -1,4 +1,5 @@
 #include "parser_context.h"
+#include "ast/ast_printer.h"
 #include "ast/decl.h"
 #include "ast/type.h"
 #include "parse_utils.h"
@@ -46,7 +47,7 @@ Token *ParserContext::new_token(int lineno, const char *text,
     break;
   }
 
-  Token *token = new Token(type, std::move(val));
+  Token *token = new Token(lineno, type, std::move(val));
   logger_.write("Line# {}: Token <{}> Lexeme {} found\n", line,
                 token->type_str(), lexeme);
 
@@ -114,7 +115,7 @@ Type *ParserContext::get_base_type(Token *token)
     break;
   case ID:
   {
-    auto symbol = table_.look_up(*token->value());
+    auto symbol = table_.look_up(token->value());
 
     if (symbol->type() == SymbolType::TYPE)
     {
@@ -169,7 +170,12 @@ Decl *ParserContext::lookup_symbol(std::string_view name)
   return nullptr;
 }
 
-void ParserContext::parse()
+void ParserContext::parse() { yyparse(scanner_, this); }
+
+void ParserContext::print_ast()
 {
-  yyparse(scanner_, this);
+  ASTPrinter printer(this);
+  printer.print(ast_root_.get());
 }
+
+void ParserContext::print_pt() { pt_root_->print(this, 0); }

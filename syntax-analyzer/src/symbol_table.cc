@@ -6,6 +6,7 @@ SymbolTable::SymbolTable(size_t init_bucket_size, Logger *logger)
       logger_(logger) {
   // initialse the global scope
   enter_scope();
+  global_scope_ = current_scope_;
 }
 
 SymbolTable::~SymbolTable() {
