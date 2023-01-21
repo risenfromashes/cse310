@@ -23,6 +23,8 @@ public:
   /* lookup symbol in all the current scopes */
   SymbolInfo *look_up(std::string_view name);
 
+  ScopeTable *current_scope() { return current_scope_; }
+
   /* print current scope */
   void log_current_scope();
 

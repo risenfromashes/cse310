@@ -150,7 +150,7 @@ public:
            FuncType *func_type, std::vector<std::unique_ptr<Expr>> arguments);
 
   static Expr *create(ParserContext *context, Location loc, ASTNode *callee,
-                      std::vector<ASTNode *> *arguments);
+                      std::vector<std::unique_ptr<Expr>> arguments);
 
   void visit(ASTVisitor *visitor) override;
 
@@ -170,15 +170,60 @@ private:
 
 class ArraySubscriptExpr : public Expr {
 public:
-  ArraySubscriptExpr(ParserContext *context, Location loc, RefExpr *ref,
+  ArraySubscriptExpr(ParserContext *context, Location loc, Expr *array,
                      Expr *subscript);
 
+  static Expr *create(ParserContext *context, Location loc, ASTNode *arr,
+                      ASTNode *subscript);
+
   void visit(ASTVisitor *visitor) override;
+
+  Expr *array() { return array_; }
+  Expr *subscript() { return subscript_; }
 
 private:
   Type *determine_type(ParserContext *context);
   ValueType determine_value_type();
 
-  RefExpr *ref_;
+  Expr *array_;
   Expr *subscript_;
+};
+
+class IntLiteral : public Expr {
+public:
+  IntLiteral(ParserContext *context, Location loc, int value);
+  Expr *create(ParserContext *context, Location loc, Token *tok);
+
+  int value() { return value_; }
+
+private:
+  Type *determine_type(ParserContext *context);
+  ValueType determine_value_type();
+  int value_;
+};
+
+class CharLiteral : public Expr {
+public:
+  CharLiteral(ParserContext *context, Location loc, int value);
+  Expr *create(ParserContext *context, Location loc, Token *tok);
+
+  int value() { return value_; }
+
+private:
+  Type *determine_type(ParserContext *context);
+  ValueType determine_value_type();
+  int value_;
+};
+
+class FloatLiteral : public Expr {
+public:
+  FloatLiteral(ParserContext *conext, Location loc, double value);
+  Expr *create(ParserContext *context, Location loc, Token *tok);
+
+  double value() { return value_; }
+
+private:
+  Type *determine_type(ParserContext *context);
+  ValueType determine_value_type();
+  double value_;
 };

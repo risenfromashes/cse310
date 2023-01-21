@@ -3,6 +3,7 @@
 #include "ast/ast_node.h"
 #include "ast/ast_visitor.h"
 #include "location.h"
+#include "parser_context.h"
 
 #include <memory>
 #include <vector>
@@ -12,33 +13,54 @@ public:
   Stmt(Location loc);
 };
 
-using Stmts = std::unique_ptr<std::vector<std::unique_ptr<Stmt>>>;
-
 class ExprStmt : public Stmt {
 public:
-  ExprStmt(Location loc);
+  ExprStmt(Location loc, Expr *expr);
 
+  static Stmt *create(ParserContext *context, Location loc, ASTNode *expr);
+
+  // can be null
   Expr *expr() { return expr_.get(); }
 
 private:
   std::unique_ptr<Expr> expr_;
 };
 
-class DeclStmt : public Stmt {};
+class DeclStmt : public Stmt {
+public:
+  DeclStmt(Location loc, std::vector<std::unique_ptr<VarDecl>> decls);
+
+  static Stmt *create(ParserContext *context, Location loc,
+                      std::vector<std::unique_ptr<VarDecl>> decls);
+
+  const std::vector<std::unique_ptr<VarDecl>> &var_decls() {
+    return var_decls_;
+  }
+
+private:
+  std::vector<std::unique_ptr<VarDecl>> var_decls_;
+};
 
 /* statement with a scope */
 class CompoundStmt : public Stmt {
 public:
-  CompoundStmt(Location loc, std::vector<std::unique_ptr<Stmt>> *stmts);
+  CompoundStmt(Location loc, std::vector<std::unique_ptr<Stmt>> stmts);
   void visit(ASTVisitor *visitor) override;
 
+  static Stmt *create(ParserContext *context, Location loc,
+                      std::vector<std::unique_ptr<Stmt>> stmts);
+
 private:
-  Stmts stmts_;
+  std::vector<std::unique_ptr<Stmt>> stmts_;
 };
 
 class IfStmt : public Stmt {
 public:
   IfStmt(Location loc, Expr *condition, Stmt *if_case, Stmt *else_case);
+
+  static Stmt *create(ParserContext *context, Location loc, ASTNode *condition,
+                      ASTNode *if_case, ASTNode *else_case);
+
   void visit(ASTVisitor *visitor) override;
 
 private:
@@ -49,31 +71,46 @@ private:
 
 class WhileStmt : public Stmt {
 public:
-  WhileStmt(Location loc, Expr *condition);
+  WhileStmt(Location loc, Expr *condition, Stmt *body);
+
+  static Stmt *create(ParserContext *context, Location loc, ASTNode *cond,
+                      ASTNode *body);
+
   void visit(ASTVisitor *visitor) override;
+
+  Expr *condition() { return condition_.get(); }
+  Stmt *body() { return body_.get(); }
 
 private:
   std::unique_ptr<Expr> condition_;
+  std::unique_ptr<Stmt> body_;
 };
 
 class ForStmt : public Stmt {
 public:
-  ForStmt(Location loc, Expr *init, Expr *cond, Expr *inc);
+  ForStmt(Location loc, ExprStmt *init, ExprStmt *cond, Expr *inc);
+
+  static Stmt *create(ParserContext *context, Location loc, ASTNode *init,
+                      ASTNode *loop, ASTNode *incr);
+
   void visit(ASTVisitor *visitor) override;
 
-  Expr *init_expr() { return init_expr_.get(); }
-  Expr *loop_condition() { return loop_condition_.get(); }
-  Expr *increment_expr() { return increment_expr_.get(); }
+  ExprStmt *init_expr() { return init_.get(); }
+  ExprStmt *loop_condition() { return condition_.get(); }
+  Expr *increment_expr() { return iter_.get(); }
 
 private:
-  std::unique_ptr<Expr> init_expr_;
-  std::unique_ptr<Expr> loop_condition_;
-  std::unique_ptr<Expr> increment_expr_;
+  std::unique_ptr<ExprStmt> init_;
+  std::unique_ptr<ExprStmt> condition_;
+  std::unique_ptr<Expr> iter_;
 };
 
 class ReturnStmt : public Stmt {
 public:
   ReturnStmt(Location loc, Expr *expr);
+
+  static Stmt *create(ParserContext *context, Location loc, Expr *expr);
+
   void visit(ASTVisitor *visitor) override;
 
   Expr *expr() { return expr_.get(); }

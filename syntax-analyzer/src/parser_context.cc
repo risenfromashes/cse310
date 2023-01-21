@@ -134,7 +134,16 @@ Type *ParserContext::get_built_in_type(BuiltInTypeName built_in) {
   return built_in_types_[idx].get();
 }
 
-Decl *ParserContext::lookup_decl(std::string_view name) {
+bool ParserContext::insert_symbol(std::string_view name, SymbolType type,
+                                  Decl *decl) {
+  if (table_.current_scope()->look_up(name)) {
+    return false;
+  }
+  table_.insert(name, type, decl);
+  return true;
+}
+
+Decl *ParserContext::lookup_symbol(std::string_view name) {
   auto symbol = table_.look_up(name);
   if (symbol) {
     return symbol->decl();

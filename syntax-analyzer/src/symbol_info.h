@@ -5,7 +5,7 @@
 #include <iostream>
 #include <string>
 
-enum class SymbolType { VAR, FUNC, TYPE };
+enum class SymbolType { VAR, FUNC, PARAM };
 
 class SymbolInfo {
 

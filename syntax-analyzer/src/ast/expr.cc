@@ -7,6 +7,73 @@
 
 #include "parser_context.h"
 
+std::string_view to_string(UnaryOp op) {
+  switch (op) {
+  case UnaryOp::PLUS:
+    return "+";
+  case UnaryOp::MINUS:
+    return "-";
+  case UnaryOp::BIT_NEGATE:
+    return "~";
+  case UnaryOp::LOGIC_NOT:
+    return "!";
+  case UnaryOp::PRE_INC:
+    return "++";
+  case UnaryOp::PRE_DEC:
+    return "--";
+  case UnaryOp::POST_INC:
+    return "++";
+  case UnaryOp::POST_DEC:
+    return "--";
+  case UnaryOp::POINTER_DEREF:
+    return "*";
+  case UnaryOp::ADDRESS:
+    return "&";
+  }
+}
+
+std::string_view to_string(BinaryOp op) {
+  switch (op) {
+  case BinaryOp::ASSIGN:
+    return "=";
+  case BinaryOp::ADD:
+    return "+";
+  case BinaryOp::SUB:
+    return "-";
+  case BinaryOp::MUL:
+    return "*";
+  case BinaryOp::DIV:
+    return "/";
+  case BinaryOp::BIT_AND:
+    return "&";
+  case BinaryOp::BIT_OR:
+    return "|";
+  case BinaryOp::BIT_XOR:
+    return "^";
+  case BinaryOp::BIT_LEFT_SHIFT:
+    return "<<";
+  case BinaryOp::BIT_RIGHT_SHIFT:
+    return ">>";
+  case BinaryOp::LOGIC_EQUALS:
+    return "==";
+  case BinaryOp::LOGIC_NOT_EQUALS:
+    return "!=";
+  case BinaryOp::LOGIC_AND:
+    return "&&";
+  case BinaryOp::LOGIC_OR:
+    return "||";
+  }
+}
+
+std::string_view to_string(ValueType type) {
+  switch (type) {
+  case ValueType::LVALUE:
+    return "lvalue";
+  case ValueType::RVALUE:
+    return "rvalue";
+  }
+}
+
 Expr::Expr(Location loc, Type *type, ValueType value_type)
     : ASTNode(loc), type_(type), value_type_(value_type) {}
 
@@ -356,7 +423,7 @@ Expr *RefExpr::create(ParserContext *context, Location loc, Token *token) {
     return ret;
   }
   std::string_view name = *token->value();
-  Decl *decl = context->lookup_decl(name);
+  Decl *decl = context->lookup_symbol(name);
   if (!decl) {
     context->report_error(loc, "Use of undeclared identifier '{}'", name);
     auto ret = new RecoveryExpr(loc);
@@ -384,22 +451,22 @@ CallExpr::CallExpr(ParserContext *context, Location loc, Expr *callee,
 }
 
 Expr *callexpr_error(Location loc, ASTNode *_callee,
-                     std::vector<ASTNode *> *arguments) {
+                     std::vector<std::unique_ptr<Expr>> arguments) {
   auto ret = new RecoveryExpr(loc);
   ret->add_child(_callee);
-  for (auto &arg : *arguments) {
+  for (auto &arg : arguments) {
     ret->add_child(std::move(arg));
   }
   return ret;
 }
 
 Expr *CallExpr::create(ParserContext *context, Location loc, ASTNode *_callee,
-                       std::vector<ASTNode *> *_args) {
+                       std::vector<std::unique_ptr<Expr>> args) {
 
   Expr *c = dynamic_cast<Expr *>(_callee);
   if (!c) {
     context->report_error(loc, "Callee is not an expression");
-    return callexpr_error(loc, _callee, _args);
+    return callexpr_error(loc, _callee, std::move(args));
   }
 
   c = c->decay();
@@ -420,28 +487,19 @@ Expr *CallExpr::create(ParserContext *context, Location loc, ASTNode *_callee,
     type = dynamic_cast<FuncType *>(c->type()->remove_pointer());
   }
 
-  std::vector<std::unique_ptr<Expr>> args;
-
   if (!valid) {
     context->report_error(loc, "Expression is not callable");
-    return callexpr_error(loc, _callee, _args);
+    return callexpr_error(loc, _callee, std::move(args));
   }
 
-  if (_args->size() != type->param_types().size()) {
+  if (args.size() != type->param_types().size()) {
     context->report_error(loc, "Argument size doesn't match function type");
-    return callexpr_error(loc, _callee, _args);
+    return callexpr_error(loc, _callee, std::move(args));
   } else {
-    auto n = _args->size();
+    auto n = args.size();
     for (size_t i = 0; i < n; i++) {
-
-      auto _arg = (*_args)[i];
-      auto arg = dynamic_cast<Expr *>(_arg);
+      auto arg = args[i].release();
       auto param_t = type->param_types()[i];
-
-      if (!arg) {
-        context->report_error(loc, "Argument {} is not an expression", i + 1);
-        return callexpr_error(loc, _callee, _args);
-      }
 
       arg = arg->decay();
       if (arg->value_type() == ValueType::LVALUE) {
@@ -449,19 +507,23 @@ Expr *CallExpr::create(ParserContext *context, Location loc, ASTNode *_callee,
       }
 
       if (arg->type() == param_t) {
+        args[i] = std::unique_ptr<Expr>(arg);
         continue;
       }
 
       auto cast = arg->type()->convertible_to(param_t);
       if (cast) {
         arg = arg->implicit_cast(param_t, *cast);
+        args[i] = std::unique_ptr<Expr>(arg);
         continue;
       }
+
+      args[i] = std::unique_ptr<Expr>(arg);
 
       context->report_error(
           loc, "Argument {} doesn't match parameter type ({} vs {})", i + 1,
           arg->type()->name(), param_t->name());
-      return callexpr_error(loc, _callee, _args);
+      return callexpr_error(loc, _callee, std::move(args));
     }
   }
 
@@ -474,69 +536,111 @@ Type *CallExpr::determine_type(ParserContext *context) {
 
 ValueType CallExpr::determine_value_type() { return ValueType::RVALUE; }
 
-std::string_view to_string(UnaryOp op) {
-  switch (op) {
-  case UnaryOp::PLUS:
-    return "+";
-  case UnaryOp::MINUS:
-    return "-";
-  case UnaryOp::BIT_NEGATE:
-    return "~";
-  case UnaryOp::LOGIC_NOT:
-    return "!";
-  case UnaryOp::PRE_INC:
-    return "++";
-  case UnaryOp::PRE_DEC:
-    return "--";
-  case UnaryOp::POST_INC:
-    return "++";
-  case UnaryOp::POST_DEC:
-    return "--";
-  case UnaryOp::POINTER_DEREF:
-    return "*";
-  case UnaryOp::ADDRESS:
-    return "&";
-  }
+ArraySubscriptExpr::ArraySubscriptExpr(ParserContext *context, Location loc,
+                                       Expr *arr, Expr *subscript)
+    : Expr(loc, determine_type(context), determine_value_type()), array_(arr),
+      subscript_(subscript) {}
+
+Expr *arrayexpr_error(Location loc, ASTNode *_arr, ASTNode *_subs) {
+  auto ret = new RecoveryExpr(loc);
+  ret->add_children({_arr, _subs});
+  return ret;
 }
 
-std::string_view to_string(BinaryOp op) {
-  switch (op) {
-  case BinaryOp::ASSIGN:
-    return "=";
-  case BinaryOp::ADD:
-    return "+";
-  case BinaryOp::SUB:
-    return "-";
-  case BinaryOp::MUL:
-    return "*";
-  case BinaryOp::DIV:
-    return "/";
-  case BinaryOp::BIT_AND:
-    return "&";
-  case BinaryOp::BIT_OR:
-    return "|";
-  case BinaryOp::BIT_XOR:
-    return "^";
-  case BinaryOp::BIT_LEFT_SHIFT:
-    return "<<";
-  case BinaryOp::BIT_RIGHT_SHIFT:
-    return ">>";
-  case BinaryOp::LOGIC_EQUALS:
-    return "==";
-  case BinaryOp::LOGIC_NOT_EQUALS:
-    return "!=";
-  case BinaryOp::LOGIC_AND:
-    return "&&";
-  case BinaryOp::LOGIC_OR:
-    return "||";
+Expr *ArraySubscriptExpr::create(ParserContext *context, Location loc,
+                                 ASTNode *_arr, ASTNode *_subscript) {
+  Expr *arr = dynamic_cast<Expr *>(_arr);
+  Expr *subscript = dynamic_cast<Expr *>(_subscript);
+  Expr *arr0 = arr;
+  Expr *s0 = subscript;
+
+  if (!arr || !subscript) {
+    context->report_error(loc, "Array or subscript is not an expression");
+    return arrayexpr_error(loc, _arr, _subscript);
   }
+
+  arr = arr->decay();
+  if (arr->value_type() == ValueType::LVALUE) {
+    arr = arr->to_rvalue();
+  }
+  /* subscript is not a function pointer or array */
+  if (subscript->value_type() == ValueType::LVALUE) {
+    subscript = subscript->to_rvalue();
+  }
+
+  bool valid = false;
+
+  if (!arr->type()->is_pointer()) {
+    context->report_error(loc, "Type {} is not subscriptable",
+                          arr0->type()->name());
+    return arrayexpr_error(loc, _arr, _subscript);
+  }
+  if (!subscript->type()->is_integral()) {
+    context->report_error(loc, "Invalid subscript of type {}",
+                          subscript->type()->name());
+    return arrayexpr_error(loc, _arr, _subscript);
+  }
+
+  return new ArraySubscriptExpr(context, loc, arr, subscript);
 }
 
-std::string_view to_string(ValueType type) {
-  switch (type) {
-  case ValueType::LVALUE:
-    return "lvalue";
-  case ValueType::RVALUE:
-    return "rvalue";
+IntLiteral::IntLiteral(ParserContext *context, Location loc, int value)
+    : Expr(loc, determine_type(context), determine_value_type()),
+      value_(value) {}
+
+Expr *IntLiteral::create(ParserContext *context, Location loc, Token *tok) {
+  if (!tok->value()) {
+    context->report_error(loc, "Literal token has no value");
+    return new RecoveryExpr(loc);
   }
+  int value = std::atoi(tok->value()->data());
+
+  return new IntLiteral(context, loc, value);
 }
+
+Type *IntLiteral::determine_type(ParserContext *context) {
+  return context->get_built_in_type(BuiltInTypeName::INT);
+}
+
+ValueType IntLiteral::determine_value_type() { return ValueType::RVALUE; }
+
+CharLiteral::CharLiteral(ParserContext *context, Location loc, int value)
+    : Expr(loc, determine_type(context), determine_value_type()),
+      value_(value) {}
+
+Expr *CharLiteral::create(ParserContext *context, Location loc, Token *tok) {
+  if (!tok->value()) {
+    context->report_error(loc, "Literal token has no value");
+    return new RecoveryExpr(loc);
+  }
+  auto val = *tok->value();
+  int value = val[0];
+
+  return new CharLiteral(context, loc, value);
+}
+
+Type *CharLiteral::determine_type(ParserContext *context) {
+  return context->get_built_in_type(BuiltInTypeName::INT);
+}
+
+ValueType CharLiteral::determine_value_type() { return ValueType::RVALUE; }
+
+FloatLiteral::FloatLiteral(ParserContext *context, Location loc, double value)
+    : Expr(loc, determine_type(context), determine_value_type()),
+      value_(value) {}
+
+Expr *FloatLiteral::create(ParserContext *context, Location loc, Token *tok) {
+  if (!tok->value()) {
+    context->report_error(loc, "Literal token has no value");
+    return new RecoveryExpr(loc);
+  }
+  auto value = std::atof(tok->value()->data());
+
+  return new FloatLiteral(context, loc, value);
+}
+
+Type *FloatLiteral::determine_type(ParserContext *context) {
+  return context->get_built_in_type(BuiltInTypeName::DOUBLE);
+}
+
+ValueType FloatLiteral::determine_value_type() { return ValueType::RVALUE; }

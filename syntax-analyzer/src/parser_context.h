@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ast/type.h"
+#include "location.h"
 #include <parse_utils.h>
 #include <string>
 #include <string_view>
@@ -51,7 +52,8 @@ public:
 
   Type *get_built_in_type(BuiltInTypeName type);
 
-  Decl *lookup_decl(std::string_view name);
+  bool insert_symbol(std::string_view name, SymbolType type, Decl *decl);
+  Decl *lookup_symbol(std::string_view name);
 
 private:
   void init_scanner();

@@ -2,6 +2,8 @@
 
 #include "ast/ast_node.h"
 #include "ast/ast_visitor.h"
+#include "ast/type.h"
+#include "parser_context.h"
 
 #include <memory>
 #include <vector>
@@ -21,6 +23,9 @@ class VarDecl : public Decl {
 public:
   VarDecl(Location loc, Type *type, std::string name);
 
+  static Decl *create(ParserContext *context, Location loc, Type *type,
+                      std::string name);
+
   void visit(ASTVisitor *visitor) override;
 
   std::string_view name() { return name_; }
@@ -28,12 +33,13 @@ public:
 private:
   std::string name_;
 };
-
-using VarDecls = std::unique_ptr<std::vector<std::unique_ptr<VarDecl>>>;
 
 class ParamDecl : public Decl {
 public:
-  ParamDecl(Location loc, std::string name);
+  ParamDecl(Location loc, Type *type, std::string name);
+
+  static Decl *create(ParserContext *context, Location loc, Type *type,
+                      std::string name);
 
   void visit(ASTVisitor *visitor) override;
 
@@ -43,22 +49,28 @@ private:
   std::string name_;
 };
 
-using ParamDecls = std::unique_ptr<std::vector<std::unique_ptr<ParamDecl>>>;
-
 class FuncDecl : public Decl {
 public:
-  FuncDecl(Location loc, Type *ret_type,
-           std::vector<std::unique_ptr<ParamDecl>> *params, std::string name);
+  FuncDecl(Location loc, FuncType *type,
+           std::vector<std::unique_ptr<ParamDecl>> params, std::string name,
+           CompoundStmt *defintion);
+
+  static Decl *create(ParserContext *context, Location loc, Type *ret_type,
+                      std::vector<std::unique_ptr<ParamDecl>> params,
+                      std::string name, CompoundStmt *definition = nullptr);
 
   void visit(ASTVisitor *visitor) override;
 
-  Type *return_type() { return return_type_; }
-  const std::vector<std::unique_ptr<ParamDecl>> &params() { return *params_; }
-
   std::string_view name() { return name_; }
+  FuncType *func_type() { return type_.get(); }
+  Type *return_type() { return type_->return_type(); }
+
+  CompoundStmt *definition() { return definition_; }
+  const std::vector<std::unique_ptr<ParamDecl>> &params() { return params_; }
 
 private:
-  ParamDecls params_;
-  Type *return_type_;
+  std::vector<std::unique_ptr<ParamDecl>> params_;
+  std::unique_ptr<FuncType> type_;
   std::string name_;
+  CompoundStmt *definition_;
 };
