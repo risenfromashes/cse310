@@ -7,8 +7,10 @@
 #include <string_view>
 #include <symbol_table.h>
 #include <token.h>
+#include <pt/pt_node.h>
 
-class ParserContext {
+class ParserContext
+{
 public:
   /* word size */
   int word_size = 16;
@@ -26,7 +28,8 @@ public:
 
   template <class... T>
   void report_error(Location loc, fmt::format_string<T...> fmt_string,
-                    T &&...args) {
+                    T &&...args)
+  {
     error_logger_.writeln(fmt_string, std::forward<decltype(args)>(args)...);
   }
 
@@ -63,9 +66,31 @@ public:
   void set_logger_file(const char *path) { logger_.set_out_file(path); }
   void set_ast_logger_file(const char *path) { ast_logger_.set_out_file(path); }
   void set_pt_logger_file(const char *path) { pt_logger_.set_out_file(path); }
-  void set_error_logger_file(const char *path) {
+  void set_error_logger_file(const char *path)
+  {
     error_logger_.set_out_file(path);
   }
+
+  std::vector<std::unique_ptr<ParamDecl>> *current_params()
+  {
+    return current_params_;
+  }
+
+  void current_params(std::vector<std::unique_ptr<ParamDecl>> *params)
+  {
+    current_params_ = params;
+  }
+
+  Type *current_type() { return current_type_; }
+  void current_type(Type *type) { current_type_ = type; }
+
+  TranslationUnitDecl *ast_root() { return ast_root_.get(); }
+  void set_ast_root(std::unique_ptr<TranslationUnitDecl> root) { ast_root_ = std::move(root); }
+
+  PTNode *pt_root() { return pt_root_.get(); }
+  void set_pt_root(PTNode *root) { pt_root_ = std::unique_ptr<PTNode>(root); }
+
+  void parse();
 
 private:
   void init_scanner();
@@ -92,4 +117,10 @@ private:
 
   /* built in types */
   std::unique_ptr<BuiltInType> built_in_types_[BUILT_IN_TYPE_COUNT];
+
+  std::vector<std::unique_ptr<ParamDecl>> *current_params_;
+  Type *current_type_;
+
+  std::unique_ptr<TranslationUnitDecl> ast_root_;
+  std::unique_ptr<PTNode> pt_root_;
 };

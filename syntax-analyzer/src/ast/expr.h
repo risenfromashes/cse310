@@ -13,11 +13,16 @@ class Decl;
 class Token;
 class ParserContext;
 
-enum class ValueType { LVALUE, RVALUE };
+enum class ValueType
+{
+  LVALUE,
+  RVALUE
+};
 
 std::string_view to_string(ValueType);
 
-enum class UnaryOp {
+enum class UnaryOp
+{
   PLUS,
   MINUS,
   BIT_NEGATE,
@@ -30,7 +35,8 @@ enum class UnaryOp {
   ADDRESS,
 };
 
-enum class BinaryOp {
+enum class BinaryOp
+{
   ASSIGN,
   ADD,
   SUB,
@@ -52,7 +58,8 @@ std::string_view to_string(BinaryOp op);
 
 class ImplicitCastExpr;
 
-class Expr : public ASTNode {
+class Expr : public ASTNode
+{
 public:
   Expr(Location loc, Type *type, ValueType value_type);
   virtual ~Expr() = default;
@@ -70,16 +77,18 @@ protected:
 };
 
 /* Error Recovery Expr */
-class RecoveryExpr : public Expr {
+class RecoveryExpr : public Expr
+{
 public:
   RecoveryExpr(Location loc);
-  void add_children(std::initializer_list<ASTNode *> nodes);
+
   void add_child(ASTNode *node);
   void add_child(std::unique_ptr<ASTNode> node);
 
   const std::vector<std::unique_ptr<ASTNode>> &children() { return children_; }
 
-  void visit(ASTVisitor *visitor) override {
+  void visit(ASTVisitor *visitor) override
+  {
     visitor->visit_recovery_expr(this);
   }
 
@@ -90,12 +99,14 @@ private:
   std::vector<std::unique_ptr<ASTNode>> children_;
 };
 
-class UnaryExpr : public Expr {
+class UnaryExpr : public Expr
+{
 public:
   UnaryExpr(ParserContext *context, Location loc, UnaryOp op, Expr *operand);
 
-  static Expr *create(ParserContext *context, Location loc, UnaryOp op,
-                      ASTNode *operand);
+  static std::unique_ptr<Expr> create(ParserContext *context, Location loc,
+                                      UnaryOp op,
+                                      std::unique_ptr<Expr> operand);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_unary_expr(this); }
 
@@ -110,13 +121,16 @@ private:
   std::unique_ptr<Expr> operand_;
 };
 
-class BinaryExpr : public Expr {
+class BinaryExpr : public Expr
+{
 public:
   BinaryExpr(ParserContext *context, Location loc, BinaryOp op, Expr *loperand,
              Expr *roperand);
 
-  static Expr *create(ParserContext *context, Location loc, BinaryOp op,
-                      ASTNode *loperand, ASTNode *roperand);
+  static std::unique_ptr<Expr> create(ParserContext *context, Location loc,
+                                      BinaryOp op,
+                                      std::unique_ptr<Expr> loperand,
+                                      std::unique_ptr<Expr> roperand);
 
   Expr *left_operand() { return loperand_.get(); }
   Expr *right_operand() { return roperand_.get(); }
@@ -134,11 +148,13 @@ private:
 };
 
 /* reference to something */
-class RefExpr : public Expr {
+class RefExpr : public Expr
+{
 public:
   RefExpr(ParserContext *context, Location loc, Decl *decl, std::string name);
 
-  static Expr *create(ParserContext *context, Location loc, Token *id);
+  static std::unique_ptr<Expr> create(ParserContext *context, Location loc,
+                                      Token *id);
 
   Decl *decl() { return decl_; }
 
@@ -154,13 +170,15 @@ private:
   std::string name_;
 };
 
-class CallExpr : public Expr {
+class CallExpr : public Expr
+{
 public:
   CallExpr(ParserContext *context, Location loc, Expr *callee,
            FuncType *func_type, std::vector<std::unique_ptr<Expr>> arguments);
 
-  static Expr *create(ParserContext *context, Location loc, ASTNode *callee,
-                      std::vector<std::unique_ptr<Expr>> arguments);
+  static std::unique_ptr<Expr>
+  create(ParserContext *context, Location loc, std::unique_ptr<Expr> callee,
+         std::vector<std::unique_ptr<Expr>> arguments);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_call_expr(this); }
 
@@ -178,15 +196,18 @@ private:
   std::vector<std::unique_ptr<Expr>> arguments_;
 };
 
-class ArraySubscriptExpr : public Expr {
+class ArraySubscriptExpr : public Expr
+{
 public:
   ArraySubscriptExpr(ParserContext *context, Location loc, Expr *array,
                      Expr *subscript);
 
-  static Expr *create(ParserContext *context, Location loc, ASTNode *arr,
-                      ASTNode *subscript);
+  static std::unique_ptr<Expr> create(ParserContext *context, Location loc,
+                                      std::unique_ptr<Expr> arr,
+                                      std::unique_ptr<Expr> subscript);
 
-  void visit(ASTVisitor *visitor) override {
+  void visit(ASTVisitor *visitor) override
+  {
     visitor->visit_array_subscript_expr(this);
   }
 
@@ -201,7 +222,8 @@ private:
   Expr *subscript_;
 };
 
-class IntLiteral : public Expr {
+class IntLiteral : public Expr
+{
 public:
   IntLiteral(ParserContext *context, Location loc, int value);
   Expr *create(ParserContext *context, Location loc, Token *tok);
@@ -216,14 +238,16 @@ private:
   int value_;
 };
 
-class CharLiteral : public Expr {
+class CharLiteral : public Expr
+{
 public:
   CharLiteral(ParserContext *context, Location loc, int value);
   Expr *create(ParserContext *context, Location loc, Token *tok);
 
   int value() { return value_; }
 
-  void visit(ASTVisitor *visitor) override {
+  void visit(ASTVisitor *visitor) override
+  {
     visitor->visit_char_literal(this);
   }
 
@@ -233,14 +257,16 @@ private:
   int value_;
 };
 
-class FloatLiteral : public Expr {
+class FloatLiteral : public Expr
+{
 public:
   FloatLiteral(ParserContext *conext, Location loc, double value);
   Expr *create(ParserContext *context, Location loc, Token *tok);
 
   double value() { return value_; }
 
-  void visit(ASTVisitor *visitor) override {
+  void visit(ASTVisitor *visitor) override
+  {
     visitor->visit_float_literal(this);
   }
 
