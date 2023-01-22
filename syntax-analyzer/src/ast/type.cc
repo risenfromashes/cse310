@@ -202,7 +202,7 @@ std::string_view to_string(CastKind kind) {
   case CastKind::POINTER_CAST:
     return "POINTER_CAST";
   }
-  return "";
+  return "INVALID_CAST";
 }
 
 std::optional<CastKind> BuiltInType::convertible_to(Type *to) {

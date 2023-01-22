@@ -38,7 +38,10 @@ public:
 
   void visit_translation_unit_decl(TranslationUnitDecl *trans_decl) override;
 
-  void enter() { depth_++; }
+  void enter() {
+    space();
+    depth_++;
+  }
   void exit() { depth_--; }
   void space();
 

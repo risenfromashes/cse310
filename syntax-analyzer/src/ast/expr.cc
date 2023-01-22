@@ -34,6 +34,40 @@ std::string_view to_string(UnaryOp op) {
   return "";
 }
 
+template <> UnaryOp from_string(std::string_view str) {
+  if (str == "+") {
+    return UnaryOp::PLUS;
+  }
+  if (str == "-") {
+    return UnaryOp::MINUS;
+  }
+  if (str == "~") {
+    return UnaryOp::BIT_NEGATE;
+  }
+  if (str == "!") {
+    return UnaryOp::LOGIC_NOT;
+  }
+  if (str == "++") {
+    return UnaryOp::PRE_INC;
+  }
+  if (str == "--") {
+    return UnaryOp::PRE_DEC;
+  }
+  if (str == "++") {
+    return UnaryOp::POST_INC;
+  }
+  if (str == "--") {
+    return UnaryOp::POST_DEC;
+  }
+  if (str == "*") {
+    return UnaryOp::POINTER_DEREF;
+  }
+  if (str == "&") {
+    return UnaryOp::ADDRESS;
+  }
+  assert(false && "INVALID OPERATOR");
+}
+
 std::string_view to_string(BinaryOp op) {
   switch (op) {
   case BinaryOp::ASSIGN:
@@ -46,6 +80,8 @@ std::string_view to_string(BinaryOp op) {
     return "*";
   case BinaryOp::DIV:
     return "/";
+  case BinaryOp::MODULUS:
+    return "%";
   case BinaryOp::BIT_AND:
     return "&";
   case BinaryOp::BIT_OR:
@@ -64,8 +100,77 @@ std::string_view to_string(BinaryOp op) {
     return "&&";
   case BinaryOp::LOGIC_OR:
     return "||";
+  case BinaryOp::LOGIC_GREATER:
+    return ">";
+  case BinaryOp::LOGIC_GE:
+    return ">=";
+  case BinaryOp::LOGIC_LESS:
+    return "<";
+  case BinaryOp::LOGIC_LE:
+    return "<=";
   }
   return "";
+}
+
+template <> BinaryOp from_string<BinaryOp>(std::string_view str) {
+  if (str == "=") {
+    return BinaryOp::ASSIGN;
+  }
+  if (str == "+") {
+    return BinaryOp::ADD;
+  }
+  if (str == "-") {
+    return BinaryOp::SUB;
+  }
+  if (str == "*") {
+    return BinaryOp::MUL;
+  }
+  if (str == "/") {
+    return BinaryOp::DIV;
+  }
+  if (str == "%") {
+    return BinaryOp::MODULUS;
+  }
+  if (str == "&") {
+    return BinaryOp::BIT_AND;
+  }
+  if (str == "|") {
+    return BinaryOp::BIT_OR;
+  }
+  if (str == "^") {
+    return BinaryOp::BIT_XOR;
+  }
+  if (str == "<<") {
+    return BinaryOp::BIT_LEFT_SHIFT;
+  }
+  if (str == ">>") {
+    return BinaryOp::BIT_RIGHT_SHIFT;
+  }
+  if (str == "==") {
+    return BinaryOp::LOGIC_EQUALS;
+  }
+  if (str == "!=") {
+    return BinaryOp::LOGIC_NOT_EQUALS;
+  }
+  if (str == "&&") {
+    return BinaryOp::LOGIC_AND;
+  }
+  if (str == "||") {
+    return BinaryOp::LOGIC_OR;
+  }
+  if (str == ">") {
+    return BinaryOp::LOGIC_GREATER;
+  }
+  if (str == ">=") {
+    return BinaryOp::LOGIC_GE;
+  }
+  if (str == "<") {
+    return BinaryOp::LOGIC_LESS;
+  }
+  if (str == "<=") {
+    return BinaryOp::LOGIC_LE;
+  }
+  assert(false && "INVALID OPERATOR");
 }
 
 std::string_view to_string(ValueType type) {
@@ -78,9 +183,10 @@ std::string_view to_string(ValueType type) {
   return "";
 }
 
-Expr::Expr(Location loc) : ASTNode(loc) {}
 Expr::Expr(Location loc, Type *type, ValueType value_type)
-    : ASTNode(loc), type_(type), value_type_(value_type) {}
+    : ASTNode(loc), type_(type), value_type_(value_type) {
+  assert(type);
+}
 
 Expr *Expr::decay() {
   CastKind cast_kind;
@@ -88,6 +194,8 @@ Expr *Expr::decay() {
     cast_kind = CastKind::ARRAY_TO_POINTER;
   } else if (type()->is_function()) {
     cast_kind = CastKind::FUNCTION_TO_PTR;
+  } else {
+    return this;
   }
   return new ImplicitCastExpr(loc_, this, type()->decay_type(), cast_kind);
 }
@@ -97,7 +205,8 @@ ImplicitCastExpr *Expr::implicit_cast(Type *to, CastKind cast_kind) {
 }
 
 ImplicitCastExpr *Expr::to_rvalue() {
-  return new ImplicitCastExpr(loc_, this, nullptr, CastKind::LVALUE_TO_RVALUE);
+  return new ImplicitCastExpr(loc_, this, type()->remove_qualifier(),
+                              CastKind::LVALUE_TO_RVALUE);
 }
 
 Type *Expr::type() {
@@ -108,8 +217,9 @@ Type *Expr::type() {
 
 ValueType Expr::value_type() { return value_type_; }
 
-RecoveryExpr::RecoveryExpr(Location loc)
-    : Expr(loc, nullptr, ValueType::RVALUE) {}
+RecoveryExpr::RecoveryExpr(ParserContext *context, Location loc)
+    : Expr(loc, context->get_built_in_type(BuiltInTypeName::VOID),
+           ValueType::RVALUE) {}
 
 void RecoveryExpr::add_child(std::unique_ptr<ASTNode> node) {
   children_.push_back(std::move(node));
@@ -120,11 +230,8 @@ void RecoveryExpr::add_child(ASTNode *node) {
 }
 
 UnaryExpr::UnaryExpr(ParserContext *context, Location loc, UnaryOp op,
-                     Expr *operand)
-    : Expr(loc), op_(op), operand_(operand) {
-  type_ = determine_type(context);
-  value_type_ = determine_value_type();
-}
+                     Expr *operand, Type *type, ValueType value_type)
+    : Expr(loc, type, value_type), op_(op), operand_(operand) {}
 
 std::unique_ptr<Expr> UnaryExpr::create(ParserContext *context, Location loc,
                                         UnaryOp op,
@@ -160,15 +267,18 @@ std::unique_ptr<Expr> UnaryExpr::create(ParserContext *context, Location loc,
   if (!valid) {
     context->report_error(loc, "Invalid use of operator '{}' on type {}",
                           to_string(op), operand->type()->name());
-    auto ret = new RecoveryExpr(loc);
+    auto ret = new RecoveryExpr(context, loc);
     ret->add_child(operand);
     return std::unique_ptr<RecoveryExpr>(ret);
   }
 
-  return std::unique_ptr<Expr>(new UnaryExpr(context, loc, op, operand));
+  auto type = determine_type(op, operand);
+  auto value_type = determine_value_type(op);
+  return std::unique_ptr<Expr>(
+      new UnaryExpr(context, loc, op, operand, type, value_type));
 }
 
-Type *UnaryExpr::determine_type(ParserContext *context) {
+Type *UnaryExpr::determine_type(UnaryOp op_, Expr *operand_) {
   auto op_type = operand_->type();
   switch (op_) {
   case UnaryOp::POINTER_DEREF:
@@ -188,7 +298,7 @@ Type *UnaryExpr::determine_type(ParserContext *context) {
   }
 }
 
-ValueType UnaryExpr::determine_value_type() {
+ValueType UnaryExpr::determine_value_type(UnaryOp op_) {
   switch (op_) {
   case UnaryOp::POINTER_DEREF:
     return ValueType::LVALUE;
@@ -198,11 +308,9 @@ ValueType UnaryExpr::determine_value_type() {
 }
 
 BinaryExpr::BinaryExpr(ParserContext *context, Location loc, BinaryOp op,
-                       Expr *l, Expr *r)
-    : Expr(loc), op_(op), loperand_(std::move(l)), roperand_(std::move(r)) {
-  type_ = determine_type(context);
-  value_type_ = determine_value_type();
-}
+                       Expr *l, Expr *r, Type *type, ValueType value_type)
+    : Expr(loc, type, value_type), op_(op), loperand_(std::move(l)),
+      roperand_(std::move(r)) {}
 
 /* get the larger (more precise) of two arithmetic expression types to upcast to
  */
@@ -237,11 +345,13 @@ static void arithmetic_upcast(Expr *&l, Expr *&r) {
   if (u == lt) {
     if (u != rt) {
       auto cast = rt->convertible_to(lt);
+      assert(cast);
       r = r->implicit_cast(lt, *cast);
     }
   } else {
     if (u != lt) {
       auto cast = lt->convertible_to(rt);
+      assert(cast);
       l = l->implicit_cast(rt, *cast);
     }
   }
@@ -272,10 +382,6 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
       }
     }
   } else {
-    ASTPrinter printer(context);
-    printer.print(l);
-    assert(l->type());
-    assert(r->type());
 
     l = l->decay();
     r = r->decay();
@@ -312,6 +418,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
       break;
     case BinaryOp::MUL:
     case BinaryOp::DIV:
+    case BinaryOp::MODULUS:
       if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
         arithmetic_upcast(l, r);
         valid = true;
@@ -385,24 +492,28 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
   if (!valid) {
     if (op == BinaryOp::ASSIGN) {
       context->report_error(loc, "Cannot assign {} of type {} to {}",
-                            to_string(op), to_string(l->value_type()),
-                            l->type()->name(), r->type()->name());
+                            to_string(l->value_type()), l->type()->name(),
+                            r->type()->name());
     } else {
       context->report_error(
           loc, "Invalid use of operator '{}' on type {} and type {}",
           to_string(op), l->type()->name(), r->type()->name());
     }
 
-    auto ret = new RecoveryExpr(loc);
+    auto ret = new RecoveryExpr(context, loc);
     ret->add_child(l);
     ret->add_child(r);
     return std::unique_ptr<Expr>(ret);
   }
 
-  return std::unique_ptr<Expr>(new BinaryExpr(context, loc, op, l, r));
+  auto type = determine_type(context, op, l, r);
+  auto value_type = determine_value_type();
+  return std::unique_ptr<Expr>(
+      new BinaryExpr(context, loc, op, l, r, type, value_type));
 }
 
-Type *BinaryExpr::determine_type(ParserContext *context) {
+Type *BinaryExpr::determine_type(ParserContext *context, BinaryOp op_,
+                                 Expr *loperand_, Expr *roperand_) {
   switch (op_) {
   case BinaryOp::LOGIC_EQUALS:
   case BinaryOp::LOGIC_NOT_EQUALS:
@@ -418,11 +529,8 @@ Type *BinaryExpr::determine_type(ParserContext *context) {
 ValueType BinaryExpr::determine_value_type() { return ValueType::RVALUE; }
 
 RefExpr::RefExpr(ParserContext *context, Location loc, Decl *decl,
-                 std::string name)
-    : decl_(decl), Expr(loc), name_(std::move(name)) {
-  type_ = determine_type(context);
-  value_type_ = determine_value_type();
-}
+                 std::string name, Type *type, ValueType value_type)
+    : decl_(decl), Expr(loc, type, value_type), name_(std::move(name)) {}
 
 std::unique_ptr<Expr> RefExpr::create(ParserContext *context, Location loc,
                                       Token *token) {
@@ -431,18 +539,19 @@ std::unique_ptr<Expr> RefExpr::create(ParserContext *context, Location loc,
 
   if (!decl) {
     context->report_error(loc, "Use of undeclared identifier '{}'", name);
-    auto ret = new RecoveryExpr(loc);
+    auto ret = new RecoveryExpr(context, loc);
     return std::unique_ptr<Expr>(ret);
   }
-
+  auto type = determine_type(decl);
+  auto value_type = determine_value_type(decl);
   return std::unique_ptr<Expr>(
-      new RefExpr(context, loc, decl, std::move(name)));
+      new RefExpr(context, loc, decl, std::move(name), type, value_type));
 }
 
-Type *RefExpr::determine_type(ParserContext *context) { return decl()->type(); }
+Type *RefExpr::determine_type(Decl *decl) { return decl->type(); }
 
-ValueType RefExpr::determine_value_type() {
-  if (decl()->type()->is_array()) {
+ValueType RefExpr::determine_value_type(Decl *decl) {
+  if (decl->type()->is_array()) {
     return ValueType::RVALUE;
   } else {
     return ValueType::LVALUE;
@@ -451,17 +560,14 @@ ValueType RefExpr::determine_value_type() {
 
 CallExpr::CallExpr(ParserContext *context, Location loc, Expr *callee,
                    FuncType *func_type,
-                   std::vector<std::unique_ptr<Expr>> arguments)
-    : Expr(loc), callee_(callee), func_type_(func_type),
-      arguments_(std::move(arguments)) {
-  type_ = determine_type(context);
-  value_type_ = determine_value_type();
-}
+                   std::vector<std::unique_ptr<Expr>> arguments, Type *type)
+    : Expr(loc, type, ValueType::RVALUE), callee_(callee),
+      func_type_(func_type), arguments_(std::move(arguments)) {}
 
 std::unique_ptr<Expr>
-callexpr_error(Location loc, ASTNode *_callee,
+callexpr_error(ParserContext *context, Location loc, ASTNode *_callee,
                std::vector<std::unique_ptr<Expr>> arguments) {
-  auto ret = new RecoveryExpr(loc);
+  auto ret = new RecoveryExpr(context, loc);
   ret->add_child(_callee);
   for (auto &arg : arguments) {
     ret->add_child(std::move(arg));
@@ -495,12 +601,12 @@ CallExpr::create(ParserContext *context, Location loc,
 
   if (!valid) {
     context->report_error(loc, "Expression is not callable");
-    return callexpr_error(loc, c, std::move(args));
+    return callexpr_error(context, loc, c, std::move(args));
   }
 
   if (args.size() != type->param_types().size()) {
     context->report_error(loc, "Argument size doesn't match function type");
-    return callexpr_error(loc, c, std::move(args));
+    return callexpr_error(context, loc, c, std::move(args));
   } else {
     auto n = args.size();
     for (size_t i = 0; i < n; i++) {
@@ -529,31 +635,25 @@ CallExpr::create(ParserContext *context, Location loc,
       context->report_error(
           loc, "Argument {} doesn't match parameter type ({} vs {})", i + 1,
           arg->type()->name(), param_t->name());
-      return callexpr_error(loc, c, std::move(args));
+      return callexpr_error(context, loc, c, std::move(args));
     }
   }
 
+  auto ret_type = determine_type(type);
+
   return std::unique_ptr<Expr>(
-      new CallExpr(context, loc, c, type, std::move(args)));
+      new CallExpr(context, loc, c, type, std::move(args), ret_type));
 }
 
-Type *CallExpr::determine_type(ParserContext *context) {
-  return func_type()->return_type();
-}
-
-ValueType CallExpr::determine_value_type() { return ValueType::RVALUE; }
+Type *CallExpr::determine_type(FuncType *type) { return type->return_type(); }
 
 ArraySubscriptExpr::ArraySubscriptExpr(ParserContext *context, Location loc,
-                                       Expr *arr, Expr *subscript)
-    : Expr(loc), array_(arr), subscript_(subscript) {
+                                       Expr *arr, Expr *subscript, Type *type)
+    : Expr(loc, type, ValueType::LVALUE), array_(arr), subscript_(subscript) {}
 
-  type_ = determine_type(context);
-  value_type_ = determine_value_type();
-}
-
-std::unique_ptr<Expr> arrayexpr_error(Location loc, ASTNode *arr,
-                                      ASTNode *subs) {
-  auto ret = new RecoveryExpr(loc);
+std::unique_ptr<Expr> arrayexpr_error(ParserContext *context, Location loc,
+                                      ASTNode *arr, ASTNode *subs) {
+  auto ret = new RecoveryExpr(context, loc);
   ret->add_child(arr);
   ret->add_child(subs);
   return std::unique_ptr<Expr>(ret);
@@ -582,28 +682,26 @@ ArraySubscriptExpr::create(ParserContext *context, Location loc,
   if (!arr->type()->is_pointer()) {
     context->report_error(loc, "Type {} is not subscriptable",
                           arr0->type()->name());
-    return arrayexpr_error(loc, arr, subscript);
+    return arrayexpr_error(context, loc, arr, subscript);
   }
   if (!subscript->type()->is_integral()) {
     context->report_error(loc, "Invalid subscript of type {}",
                           subscript->type()->name());
-    return arrayexpr_error(loc, arr, subscript);
+    return arrayexpr_error(context, loc, arr, subscript);
   }
 
+  auto type = determine_type(arr);
   return std::unique_ptr<Expr>(
-      new ArraySubscriptExpr(context, loc, arr, subscript));
+      new ArraySubscriptExpr(context, loc, arr, subscript, type));
 }
 
-Type *ArraySubscriptExpr::determine_type(ParserContext *context) {
-  return array()->type()->remove_pointer();
-}
-
-ValueType ArraySubscriptExpr::determine_value_type() {
-  return ValueType::LVALUE;
+Type *ArraySubscriptExpr::determine_type(Expr *arr) {
+  return arr->type()->remove_pointer();
 }
 
 IntLiteral::IntLiteral(ParserContext *context, Location loc, int value)
-    : Expr(loc, determine_type(context), determine_value_type()),
+    : Expr(loc, context->get_built_in_type(BuiltInTypeName::INT),
+           ValueType::RVALUE),
       value_(value) {}
 
 std::unique_ptr<Expr> IntLiteral::create(ParserContext *context, Location loc,
@@ -613,14 +711,9 @@ std::unique_ptr<Expr> IntLiteral::create(ParserContext *context, Location loc,
   return std::unique_ptr<Expr>(new IntLiteral(context, loc, value));
 }
 
-Type *IntLiteral::determine_type(ParserContext *context) {
-  return context->get_built_in_type(BuiltInTypeName::INT);
-}
-
-ValueType IntLiteral::determine_value_type() { return ValueType::RVALUE; }
-
 CharLiteral::CharLiteral(ParserContext *context, Location loc, int value)
-    : Expr(loc, determine_type(context), determine_value_type()),
+    : Expr(loc, context->get_built_in_type(BuiltInTypeName::CHAR),
+           ValueType::RVALUE),
       value_(value) {}
 
 std::unique_ptr<Expr> CharLiteral::create(ParserContext *context, Location loc,
@@ -631,14 +724,9 @@ std::unique_ptr<Expr> CharLiteral::create(ParserContext *context, Location loc,
   return std::unique_ptr<Expr>(new CharLiteral(context, loc, value));
 }
 
-Type *CharLiteral::determine_type(ParserContext *context) {
-  return context->get_built_in_type(BuiltInTypeName::INT);
-}
-
-ValueType CharLiteral::determine_value_type() { return ValueType::RVALUE; }
-
 FloatLiteral::FloatLiteral(ParserContext *context, Location loc, double value)
-    : Expr(loc, determine_type(context), determine_value_type()),
+    : Expr(loc, context->get_built_in_type(BuiltInTypeName::DOUBLE),
+           ValueType::RVALUE),
       value_(value) {}
 
 std::unique_ptr<Expr> FloatLiteral::create(ParserContext *context, Location loc,
@@ -647,9 +735,3 @@ std::unique_ptr<Expr> FloatLiteral::create(ParserContext *context, Location loc,
 
   return std::unique_ptr<Expr>(new FloatLiteral(context, loc, value));
 }
-
-Type *FloatLiteral::determine_type(ParserContext *context) {
-  return context->get_built_in_type(BuiltInTypeName::DOUBLE);
-}
-
-ValueType FloatLiteral::determine_value_type() { return ValueType::RVALUE; }

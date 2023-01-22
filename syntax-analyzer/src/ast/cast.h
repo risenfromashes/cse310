@@ -11,13 +11,13 @@ public:
   }
 
   CastKind cast_kind() { return cast_kind_; }
-  Expr *source_expr() { return src_expr_; }
+  Expr *source_expr() { return src_expr_.get(); }
 
 private:
   Type *determine_type();
   ValueType determine_value_type();
 
-  Expr *src_expr_;
+  std::unique_ptr<Expr> src_expr_;
   Type *dest_type_;
   CastKind cast_kind_;
 };

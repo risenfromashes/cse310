@@ -48,7 +48,7 @@ void Terminal::print(ParserContext *context, int depth) {
     logger->write(" ");
   }
   logger->write("{} : {}", token_->type_str(), token_->value());
-  logger->writeln("\t<Line: {}", token_->line());
+  logger->writeln("\t<Line: {}>", token_->line());
 }
 
 NonTerminal::~NonTerminal() {}

@@ -9,6 +9,8 @@
 #include <optional>
 #include <vector>
 
+#include "parse_utils.h"
+
 class Decl;
 class Token;
 class ParserContext;
@@ -36,6 +38,7 @@ enum class BinaryOp {
   SUB,
   MUL,
   DIV,
+  MODULUS,
   BIT_AND,
   BIT_OR,
   BIT_XOR,
@@ -53,6 +56,9 @@ enum class BinaryOp {
 
 std::string_view to_string(UnaryOp op);
 std::string_view to_string(BinaryOp op);
+
+template <> UnaryOp from_string<UnaryOp>(std::string_view str);
+template <> BinaryOp from_string<BinaryOp>(std::string_view str);
 
 inline BinaryOp get_relop(std::string_view op) {
   if (op == ">=")
@@ -74,7 +80,6 @@ class ImplicitCastExpr;
 
 class Expr : public ASTNode {
 public:
-  Expr(Location loc);
   Expr(Location loc, Type *type, ValueType value_type);
   virtual ~Expr() = default;
 
@@ -93,7 +98,7 @@ protected:
 /* Error Recovery Expr */
 class RecoveryExpr : public Expr {
 public:
-  RecoveryExpr(Location loc);
+  RecoveryExpr(ParserContext *context, Location loc);
 
   void add_child(ASTNode *node);
   void add_child(std::unique_ptr<ASTNode> node);
@@ -105,15 +110,15 @@ public:
   }
 
 private:
-  Type *determine_type(ParserContext *context) { return nullptr; }
-  ValueType determine_value_type() { return ValueType::RVALUE; }
+  static Type *determine_type(ParserContext *context) { return nullptr; }
 
   std::vector<std::unique_ptr<ASTNode>> children_;
 };
 
 class UnaryExpr : public Expr {
 public:
-  UnaryExpr(ParserContext *context, Location loc, UnaryOp op, Expr *operand);
+  UnaryExpr(ParserContext *context, Location loc, UnaryOp op, Expr *operand,
+            Type *type, ValueType value_type);
 
   static std::unique_ptr<Expr> create(ParserContext *context, Location loc,
                                       UnaryOp op,
@@ -125,8 +130,8 @@ public:
   UnaryOp op() { return op_; }
 
 private:
-  Type *determine_type(ParserContext *context);
-  ValueType determine_value_type();
+  static Type *determine_type(UnaryOp op, Expr *operand);
+  static ValueType determine_value_type(UnaryOp op);
 
   UnaryOp op_;
   std::unique_ptr<Expr> operand_;
@@ -135,7 +140,7 @@ private:
 class BinaryExpr : public Expr {
 public:
   BinaryExpr(ParserContext *context, Location loc, BinaryOp op, Expr *loperand,
-             Expr *roperand);
+             Expr *roperand, Type *type, ValueType value_type);
 
   static std::unique_ptr<Expr> create(ParserContext *context, Location loc,
                                       BinaryOp op,
@@ -149,8 +154,9 @@ public:
   void visit(ASTVisitor *visitor) override { visitor->visit_binary_expr(this); }
 
 private:
-  Type *determine_type(ParserContext *context);
-  ValueType determine_value_type();
+  static Type *determine_type(ParserContext *context, BinaryOp op,
+                              Expr *loperand, Expr *roperand);
+  static ValueType determine_value_type();
 
   BinaryOp op_;
   std::unique_ptr<Expr> loperand_;
@@ -160,7 +166,8 @@ private:
 /* reference to something */
 class RefExpr : public Expr {
 public:
-  RefExpr(ParserContext *context, Location loc, Decl *decl, std::string name);
+  RefExpr(ParserContext *context, Location loc, Decl *decl, std::string name,
+          Type *type, ValueType value_type);
 
   static std::unique_ptr<Expr> create(ParserContext *context, Location loc,
                                       Token *id);
@@ -172,8 +179,8 @@ public:
   void visit(ASTVisitor *visitor) override { visitor->visit_ref_expr(this); }
 
 private:
-  Type *determine_type(ParserContext *context);
-  ValueType determine_value_type();
+  static Type *determine_type(Decl *decl);
+  static ValueType determine_value_type(Decl *decl);
 
   Decl *decl_;
   std::string name_;
@@ -182,7 +189,8 @@ private:
 class CallExpr : public Expr {
 public:
   CallExpr(ParserContext *context, Location loc, Expr *callee,
-           FuncType *func_type, std::vector<std::unique_ptr<Expr>> arguments);
+           FuncType *func_type, std::vector<std::unique_ptr<Expr>> arguments,
+           Type *type);
 
   static std::unique_ptr<Expr>
   create(ParserContext *context, Location loc, std::unique_ptr<Expr> callee,
@@ -196,8 +204,7 @@ public:
   const std::vector<std::unique_ptr<Expr>> &arguments() { return arguments_; }
 
 private:
-  Type *determine_type(ParserContext *context);
-  ValueType determine_value_type();
+  static Type *determine_type(FuncType *type);
 
   FuncType *func_type_;
   std::unique_ptr<Expr> callee_;
@@ -207,7 +214,7 @@ private:
 class ArraySubscriptExpr : public Expr {
 public:
   ArraySubscriptExpr(ParserContext *context, Location loc, Expr *array,
-                     Expr *subscript);
+                     Expr *subscript, Type *type);
 
   static std::unique_ptr<Expr> create(ParserContext *context, Location loc,
                                       std::unique_ptr<Expr> arr,
@@ -217,15 +224,14 @@ public:
     visitor->visit_array_subscript_expr(this);
   }
 
-  Expr *array() { return array_; }
-  Expr *subscript() { return subscript_; }
+  Expr *array() { return array_.get(); }
+  Expr *subscript() { return subscript_.get(); }
 
 private:
-  Type *determine_type(ParserContext *context);
-  ValueType determine_value_type();
+  static Type *determine_type(Expr *expr);
 
-  Expr *array_;
-  Expr *subscript_;
+  std::unique_ptr<Expr> array_;
+  std::unique_ptr<Expr> subscript_;
 };
 
 class IntLiteral : public Expr {
@@ -239,8 +245,6 @@ public:
   void visit(ASTVisitor *visitor) override { visitor->visit_int_literal(this); }
 
 private:
-  Type *determine_type(ParserContext *context);
-  ValueType determine_value_type();
   int value_;
 };
 
@@ -257,8 +261,6 @@ public:
   }
 
 private:
-  Type *determine_type(ParserContext *context);
-  ValueType determine_value_type();
   int value_;
 };
 
@@ -275,7 +277,5 @@ public:
   }
 
 private:
-  Type *determine_type(ParserContext *context);
-  ValueType determine_value_type();
   double value_;
 };

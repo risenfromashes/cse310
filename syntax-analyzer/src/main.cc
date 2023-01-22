@@ -30,7 +30,7 @@ int main(int argc, char **argv) {
 
   // Logger<0>::set_out_file(log_file);
   // Logger<1>::set_out_file(out_file);
-  const char *in_file = "../noerror.c";
+  const char *in_file = "../sserror.c";
 
   std::FILE *in = std::fopen(in_file, "r");
 
@@ -41,6 +41,8 @@ int main(int argc, char **argv) {
     context.set_logger_file("log.txt");
     context.set_error_logger_file("err.txt");
     context.parse();
+    context.print_ast();
+    context.print_pt();
   } else {
     fmt::print(stderr, "Couldn't access input file: {}", in_file);
   }

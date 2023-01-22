@@ -5,10 +5,17 @@
 
 #include "parser_context.h"
 
-Decl::Decl(Location loc, Type *type) : ASTNode(loc), type_(type) {}
+Decl::Decl(Location loc, std::string name)
+    : ASTNode(loc), name_(std::move(name)) {}
+
+TypeDecl::TypeDecl(Location loc, std::shared_ptr<Type> type, std::string name)
+    : Decl(loc, std::move(name)), type_(std::move(type)) {}
+
+TypedDecl::TypedDecl(Location loc, Type *type, std::string name)
+    : Decl(loc, std::move(name)), type_(type) {}
 
 VarDecl::VarDecl(Location loc, Type *type, std::string name)
-    : Decl(loc, type), name_(std::move(name)) {}
+    : TypedDecl(loc, type, std::move(name)) {}
 
 std::unique_ptr<VarDecl> VarDecl::create(ParserContext *context, Location loc,
                                          Type *type, std::string name) {
@@ -23,7 +30,7 @@ std::unique_ptr<VarDecl> VarDecl::create(ParserContext *context, Location loc,
 }
 
 ParamDecl::ParamDecl(Location loc, Type *type, std::string name)
-    : Decl(loc, type), name_(std::move(name)) {}
+    : TypedDecl(loc, type, std::move(name)) {}
 
 std::unique_ptr<ParamDecl> ParamDecl::create(ParserContext *context,
                                              Location loc, Type *type,
@@ -34,11 +41,11 @@ std::unique_ptr<ParamDecl> ParamDecl::create(ParserContext *context,
   return std::unique_ptr<ParamDecl>(ret);
 }
 
-FuncDecl::FuncDecl(Location loc, FuncType *type,
+FuncDecl::FuncDecl(Location loc, std::shared_ptr<FuncType> type,
                    std::vector<std::unique_ptr<ParamDecl>> params,
                    std::string name, CompoundStmt *definition)
-    : Decl(loc, type), params_(std::move(params)), type_(type),
-      name_(std::move(name)), definition_(definition) {}
+    : TypeDecl(loc, std::move(type), std::move(name)),
+      params_(std::move(params)), definition_(definition) {}
 
 std::unique_ptr<FuncDecl>
 FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
@@ -51,11 +58,9 @@ FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
     param_types.push_back(param->type());
   }
 
-  std::cout << name << " function" << std::endl;
-
   auto sym = context->global_scope()->look_up(name);
 
-  FuncType *func_type = nullptr;
+  std::shared_ptr<FuncType> func_type;
 
   if (sym) {
     FuncDecl *prev_func = dynamic_cast<FuncDecl *>(sym->decl());
@@ -65,10 +70,10 @@ FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
         context->report_error(loc, "Redefinition of function '{}'", name);
       }
     } else {
-      func_type = new FuncType(ret_type, std::move(param_types));
+      func_type = std::make_shared<FuncType>(ret_type, std::move(param_types));
     }
   } else {
-    func_type = new FuncType(ret_type, std::move(param_types));
+    func_type = std::make_shared<FuncType>(ret_type, std::move(param_types));
   }
 
   auto ret = new FuncDecl(loc, func_type, std::move(params), name, definition);

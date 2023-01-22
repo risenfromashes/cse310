@@ -71,7 +71,7 @@ program : program unit {
     $$ = NonTerminal::create(context, @$, "program", $1, $2);
     $$->ast = std::move($1->ast);
     auto& t = $$->decls();
-    auto& f = $1->decls();
+    auto& f = $2->decls();
     std::move(f.begin(), f.end(), std::back_inserter(t));
   } 
 	| unit {
@@ -126,7 +126,6 @@ func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statem
     }
 		| type_specifier ID LPAREN RPAREN compound_statement {
         $$ = NonTerminal::create(context, @$, "func_definition", $1, $2, $3, $4, $5);
-        std::cout << $5->location().start_line() << std::endl;
         $$->ast = FuncDecl::create(context, @$, $1->type(), 
                                     ParamDecls(),
                                     $2->value(), std::move($5->stmt())); 
@@ -135,30 +134,30 @@ func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statem
 
 
 parameter_list  : parameter_list COMMA type_specifier ID {
-        $$ = NonTerminal::create(context, @$, "parameter_list", $1, $2, $3, $4);
-        $$->ast = std::move($1->ast);
-        $$->paramdecls().push_back(ParamDecl::create(context, @$, $3->type(), 
-                                      $4->value()));
-        context->current_params(&$$->paramdecls());
-    }
+	        $$ = NonTerminal::create(context, @$, "parameter_list", $1, $2, $3, $4);
+	        $$->ast = std::move($1->ast);
+	        $$->paramdecls().push_back(ParamDecl::create(context, @$, $3->type(), 
+	                                      $4->value()));
+	        context->current_params(&$$->paramdecls());
+    	}
 		| parameter_list COMMA type_specifier {
-        $$ = NonTerminal::create(context, @$, "parameter_list", $1, $2, $3);
-        $$->ast = std::move($1->ast);
-        $$->paramdecls().push_back(ParamDecl::create(context, @$, $3->type(), ""));
-        context->current_params(&$$->paramdecls());
-    }
+	        $$ = NonTerminal::create(context, @$, "parameter_list", $1, $2, $3);
+	        $$->ast = std::move($1->ast);
+	        $$->paramdecls().push_back(ParamDecl::create(context, @$, $3->type(), ""));
+	        context->current_params(&$$->paramdecls());
+    	}
  		| type_specifier ID {
-        $$ = NonTerminal::create(context, @$, "parameter_list", $1, $2);
-        $$->ast = ParamDecls();
-        $$->paramdecls().push_back(ParamDecl::create(context, @$, $1->type(), $2->value()));
-        context->current_params(&$$->paramdecls());
-    }
+	        $$ = NonTerminal::create(context, @$, "parameter_list", $1, $2);
+	        $$->ast = ParamDecls();
+	        $$->paramdecls().push_back(ParamDecl::create(context, @$, $1->type(), $2->value()));
+	        context->current_params(&$$->paramdecls());
+    	}
 		| type_specifier {
-        $$ = NonTerminal::create(context, @$, "parameter_list", $1);
-        $$->ast = ParamDecls();
-        $$->paramdecls().push_back(ParamDecl::create(context, @$, $1->type(), ""));
-        context->current_params(&$$->paramdecls());
-    }
+	        $$ = NonTerminal::create(context, @$, "parameter_list", $1);
+	        $$->ast = ParamDecls();
+	        $$->paramdecls().push_back(ParamDecl::create(context, @$, $1->type(), ""));
+	        context->current_params(&$$->paramdecls());
+    	}
  		;
 
  		
@@ -172,12 +171,12 @@ compound_statement : lcurl statements RCURL {
           $$->ast = CompoundStmt::create(context, @$, Stmts());
           context->exit_scope();
         }
- 		    ;
+ 		;
  		    
 var_declaration : type_specifier declaration_list SEMICOLON {
           $$ = NonTerminal::create(context, @$, "var_declaration", $1, $2, $3);
           $$->ast = std::move($2->ast);
-     }
+     	 }
  		 ;
  		 
 type_specifier	: INT { 
@@ -200,7 +199,7 @@ type_specifier	: INT {
 declaration_list : declaration_list COMMA ID {
           $$ = NonTerminal::create(context, @$, "declaration_list", $1, $2, $3);
           $$->ast = std::move($1->ast);
-          $1->vardecls().push_back(
+          $$->vardecls().push_back(
               VarDecl::create(context, @3, context->current_type(), $3->value())
           );
       }
@@ -222,11 +221,11 @@ declaration_list : declaration_list COMMA ID {
           $$ = NonTerminal::create(context, @$, "declaration_list", $1, $2, $3, $4);
           $$->ast = VarDecls{};
           size_t size = std::atoi($3->value().c_str());
-          auto type = context->current_type()->array_type()->sized_array(size);
+          auto type = context->current_type()->sized_array(size);
           $$->vardecls().push_back(
               VarDecl::create(context, @3, type, $1->value()));
       }
- 		  ;
+      ;
  		  
 statements : statement {
           $$ = NonTerminal::create(context, @$, "statements", $1);
@@ -430,9 +429,7 @@ arguments : arguments COMMA logic_expression {
  lcurl	: LCURL {
       $$ = $1;
       context->enter_scope();
-      std::cout << "current params: " << context->current_params() << std::endl;
       if (context->current_params()){
-        std::cout << "Entering parameters" << std::endl;
         for(auto& param : *context->current_params()){
           if (param->name() == ""){
             context->report_error(param->location(), "Nameless param");

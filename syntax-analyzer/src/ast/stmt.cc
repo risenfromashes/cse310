@@ -16,9 +16,6 @@ std::unique_ptr<Stmt> ExprStmt::create(ParserContext *context, Location loc,
   auto expr = _expr.release();
   assert(expr);
 
-  ASTPrinter printer(context);
-  printer.print(expr);
-
   expr = expr->decay();
   if (expr->value_type() == ValueType::LVALUE) {
     expr = expr->to_rvalue();

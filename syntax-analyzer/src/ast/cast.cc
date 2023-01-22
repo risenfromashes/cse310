@@ -8,7 +8,6 @@ ImplicitCastExpr::ImplicitCastExpr(Location loc, Expr *src_expr,
     : Expr(loc, dest_type, ValueType::RVALUE), src_expr_(src_expr),
       dest_type_(dest_type), cast_kind_(kind) {
   type_ = determine_type();
-  value_type_ = ValueType::RVALUE;
 }
 
 Type *ImplicitCastExpr::determine_type() {

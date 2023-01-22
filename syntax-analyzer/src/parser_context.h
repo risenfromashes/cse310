@@ -2,6 +2,7 @@
 
 #include "ast/type.h"
 #include "location.h"
+#include <array>
 #include <parse_utils.h>
 #include <pt/pt_node.h>
 #include <string>
@@ -30,6 +31,7 @@ public:
                     T &&...args) {
     error_logger_.write("Line #{}: ", loc.start_line());
     error_logger_.writeln(fmt_string, std::forward<decltype(args)>(args)...);
+    error_count_++;
   }
 
   void enter_scope();
@@ -119,9 +121,10 @@ private:
   SymbolTable table_;
 
   /* built in types */
-  std::unique_ptr<BuiltInType> built_in_types_[BUILT_IN_TYPE_COUNT];
+  std::array<std::unique_ptr<BuiltInType>, BUILT_IN_TYPE_COUNT> built_in_types_;
 
   std::vector<std::unique_ptr<ParamDecl>> *current_params_;
+
   Type *current_type_;
 
   std::unique_ptr<TranslationUnitDecl> ast_root_;

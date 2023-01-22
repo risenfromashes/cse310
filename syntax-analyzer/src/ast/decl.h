@@ -13,16 +13,37 @@ class Stmt;
 
 class Decl : public ASTNode {
 public:
-  Decl(Location loc, Type *type);
+  Decl(Location loc, std::string name);
   virtual ~Decl() = default;
 
-  Type *type() { return type_; }
+  virtual Type *type() = 0;
+  std::string_view name() { return name_; }
 
 private:
+  std::string name_;
+};
+
+class TypeDecl : public Decl {
+public:
+  TypeDecl(Location loc, std::shared_ptr<Type> type, std::string name);
+
+  Type *type() override { return type_.get(); }
+
+protected:
+  std::shared_ptr<Type> type_;
+};
+
+class TypedDecl : public Decl {
+public:
+  TypedDecl(Location loc, Type *type, std::string name);
+
+  Type *type() override { return type_; }
+
+protected:
   Type *type_;
 };
 
-class VarDecl : public Decl {
+class VarDecl : public TypedDecl {
 public:
   VarDecl(Location loc, Type *type, std::string name);
 
@@ -30,14 +51,9 @@ public:
                                          Type *type, std::string name);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_var_decl(this); }
-
-  std::string_view name() { return name_; }
-
-private:
-  std::string name_;
 };
 
-class ParamDecl : public Decl {
+class ParamDecl : public TypedDecl {
 public:
   ParamDecl(Location loc, Type *type, std::string name);
 
@@ -45,16 +61,11 @@ public:
                                            Type *type, std::string name);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_param_decl(this); }
-
-  std::string_view name() { return name_; }
-
-private:
-  std::string name_;
 };
 
-class FuncDecl : public Decl {
+class FuncDecl : public TypeDecl {
 public:
-  FuncDecl(Location loc, FuncType *type,
+  FuncDecl(Location loc, std::shared_ptr<FuncType> type,
            std::vector<std::unique_ptr<ParamDecl>> params, std::string name,
            CompoundStmt *defintion);
 
@@ -66,8 +77,12 @@ public:
   void visit(ASTVisitor *visitor) override { visitor->visit_func_decl(this); }
 
   std::string_view name() { return name_; }
-  FuncType *func_type() { return type_.get(); }
-  Type *return_type() { return type_->return_type(); }
+
+  std::shared_ptr<FuncType> func_type() {
+    return std::dynamic_pointer_cast<FuncType>(type_);
+  }
+
+  Type *return_type() { return func_type()->return_type(); }
 
   /* can be null */
   CompoundStmt *definition() { return definition_.get(); }
@@ -75,7 +90,6 @@ public:
 
 private:
   std::vector<std::unique_ptr<ParamDecl>> params_;
-  std::unique_ptr<FuncType> type_;
   std::string name_;
   std::unique_ptr<CompoundStmt> definition_;
 };

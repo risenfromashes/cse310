@@ -229,7 +229,7 @@ void ASTPrinter::space() {
 
 void ASTPrinter::log_location(ASTNode *node) {
   auto &loc = node->location();
-  logger_->write("<line:{}:{}, line:{}:{} ", loc.start_line(), loc.start_col(),
+  logger_->write("<line:{}:{}, line:{}:{}> ", loc.start_line(), loc.start_col(),
                  loc.end_line(), loc.end_col());
 }
 
@@ -237,6 +237,7 @@ void ASTPrinter::visit_translation_unit_decl(TranslationUnitDecl *trans_decl) {
   enter();
   logger_->write("TranslationUnitDecl ");
   log_location(trans_decl);
+  logger_->endl();
   for (auto &node : trans_decl->decl_units()) {
     node->visit(this);
   }

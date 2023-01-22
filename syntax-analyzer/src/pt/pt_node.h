@@ -83,29 +83,21 @@ public:
   }
 
   Stmts &stmts() {
-    Logger logger;
-    print_rule(&logger, true);
     assert(std::holds_alternative<Stmts>(ast));
     return std::get<Stmts>(ast);
   }
 
   VarDecls &vardecls() {
-    Logger logger;
-    print_rule(&logger, true);
     assert(std::holds_alternative<VarDecls>(ast));
     return std::get<VarDecls>(ast);
   }
 
   ParamDecls &paramdecls() {
-    Logger logger;
-    print_rule(&logger, true);
     assert(std::holds_alternative<ParamDecls>(ast));
     return std::get<ParamDecls>(ast);
   }
 
   Exprs &exprs() {
-    Logger logger;
-    print_rule(&logger, true);
     assert(std::holds_alternative<Exprs>(ast));
     return std::get<Exprs>(ast);
   }
