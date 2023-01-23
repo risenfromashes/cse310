@@ -55,7 +55,21 @@ Token *ParserContext::new_token(int lineno, const char *text,
   return token;
 }
 
-void ParserContext::enter_scope() { table_.enter_scope(); }
+void ParserContext::enter_scope() { 
+  table_.enter_scope();
+      if (current_params()){
+        for(auto& param : *current_params()){
+          if (param->name() == ""){
+            report_error(param->location(), "Nameless param");
+            continue;
+          }	
+          if (!insert_symbol(param->name(), SymbolType::PARAM, param.get())){
+            report_error(param->location(), "Redefinition of parameter '{}", param->name());
+          }
+        }
+        current_params(nullptr);
+      } 
+}
 
 void ParserContext::exit_scope() { table_.exit_scope(); }
 
@@ -158,8 +172,11 @@ bool ParserContext::insert_symbol(std::string_view name, SymbolType type,
   table_.insert(name, type, decl);
   return true;
 }
-
-Decl *ParserContext::lookup_symbol(std::string_view name)
+SymbolInfo *ParserContext::lookup_symbol(std::string_view name)
+{
+  return table_.look_up(name);
+}
+Decl *ParserContext::lookup_decl(std::string_view name)
 {
   auto symbol = table_.look_up(name);
   if (symbol)

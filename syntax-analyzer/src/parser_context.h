@@ -34,6 +34,15 @@ public:
     error_count_++;
   }
 
+  template <class... T>
+  void report_warning(Location loc, fmt::format_string<T...> fmt_string,
+                    T &&...args) {
+    error_logger_.write("Line #{}: ", loc.start_line());
+    error_logger_.write("Warning: ");
+    error_logger_.writeln(fmt_string, std::forward<decltype(args)>(args)...);
+    error_count_++;
+  }
+
   void enter_scope();
   void exit_scope();
 
@@ -57,7 +66,8 @@ public:
   Type *get_built_in_type(BuiltInTypeName type);
 
   bool insert_symbol(std::string_view name, SymbolType type, Decl *decl);
-  Decl *lookup_symbol(std::string_view name);
+  SymbolInfo *lookup_symbol(std::string_view name);
+  Decl* lookup_decl(std::string_view name);
 
   Logger *logger() { return &logger_; }
   Logger *ast_logger() { return &ast_logger_; }

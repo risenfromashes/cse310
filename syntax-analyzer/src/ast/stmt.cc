@@ -16,9 +16,9 @@ std::unique_ptr<Stmt> ExprStmt::create(ParserContext *context, Location loc,
   auto expr = _expr.release();
   assert(expr);
 
-  expr = expr->decay();
+  expr = expr->decay(context);
   if (expr->value_type() == ValueType::LVALUE) {
-    expr = expr->to_rvalue();
+    expr = expr->to_rvalue(context);
   }
   return std::unique_ptr<Stmt>(new ExprStmt(loc, expr));
 }
@@ -53,9 +53,9 @@ std::unique_ptr<Stmt> IfStmt::create(ParserContext *context, Location loc,
   auto if_ = _if.release();
   auto else_ = _else.release();
   assert(cond && if_ && else_);
-  cond = cond->decay();
+  cond = cond->decay(context);
   if (cond->value_type() == ValueType::LVALUE) {
-    cond = cond->to_rvalue();
+    cond = cond->to_rvalue(context);
   }
 
   if (!cond->type()->is_scalar()) {
@@ -74,9 +74,9 @@ std::unique_ptr<Stmt> WhileStmt::create(ParserContext *context, Location loc,
   auto cond = _cond.release();
   auto body = _body.release();
   assert(cond && body);
-  cond = cond->decay();
+  cond = cond->decay(context);
   if (cond->value_type() == ValueType::LVALUE) {
-    cond = cond->to_rvalue();
+    cond = cond->to_rvalue(context);
   }
 
   if (!cond->type()->is_scalar()) {

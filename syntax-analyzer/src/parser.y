@@ -49,7 +49,6 @@ void lyyerror(YYLTYPE t, char *s, ...);
 %type <non_term> parameter_list compound_statement statements declaration_list statement 
 %type <non_term> expression expression_statement logic_expression rel_expression simple_expression
 %type <non_term> term unary_expression factor variable argument_list arguments 
-%type <token>    lcurl
 
 
 
@@ -161,13 +160,18 @@ parameter_list  : parameter_list COMMA type_specifier ID {
  		;
 
  		
-compound_statement : lcurl statements RCURL {
-          $$ = NonTerminal::create(context, @$, "compound_statement", $1, $2, $3);
-          $$->ast = CompoundStmt::create(context, @$, std::move($2->stmts()));
+compound_statement : LCURL { 
+          context->enter_scope(); 
+          } 
+           statements RCURL {
+          $$ = NonTerminal::create(context, @$, "compound_statement", $1, $3, $4);
+          $$->ast = CompoundStmt::create(context, @$, std::move($3->stmts()));
           context->exit_scope();
         }
- 		    | lcurl RCURL {
-          $$ = NonTerminal::create(context, @$, "compound_statement", $1, $2);
+ 		    | LCURL {
+          context->enter_scope();
+        } RCURL {
+          $$ = NonTerminal::create(context, @$, "compound_statement", $1, $3);
           $$->ast = CompoundStmt::create(context, @$, Stmts());
           context->exit_scope();
         }
@@ -425,24 +429,6 @@ arguments : arguments COMMA logic_expression {
             $$->exprs().push_back(std::move($1->expr()));
         }
 	      ;
- 
- lcurl	: LCURL {
-      $$ = $1;
-      context->enter_scope();
-      if (context->current_params()){
-        for(auto& param : *context->current_params()){
-          if (param->name() == ""){
-            context->report_error(param->location(), "Nameless param");
-            continue;
-          }	
-          if (!context->insert_symbol(param->name(), SymbolType::PARAM, param.get())){
-            context->report_error(param->location(), "Param redefinition");
-          }
-        }
-        context->current_params(nullptr);
-      }
- 		}
-		;
 
 %%
 

@@ -66,6 +66,7 @@ template <> UnaryOp from_string(std::string_view str) {
     return UnaryOp::ADDRESS;
   }
   assert(false && "INVALID OPERATOR");
+  return UnaryOp::PLUS;
 }
 
 std::string_view to_string(BinaryOp op) {
@@ -171,6 +172,7 @@ template <> BinaryOp from_string<BinaryOp>(std::string_view str) {
     return BinaryOp::LOGIC_LE;
   }
   assert(false && "INVALID OPERATOR");
+  return BinaryOp::ADD;
 }
 
 std::string_view to_string(ValueType type) {
@@ -188,7 +190,7 @@ Expr::Expr(Location loc, Type *type, ValueType value_type)
   assert(type);
 }
 
-Expr *Expr::decay() {
+Expr *Expr::decay(ParserContext* context) {
   CastKind cast_kind;
   if (type()->is_array()) {
     cast_kind = CastKind::ARRAY_TO_POINTER;
@@ -197,15 +199,15 @@ Expr *Expr::decay() {
   } else {
     return this;
   }
-  return new ImplicitCastExpr(loc_, this, type()->decay_type(), cast_kind);
+  return new ImplicitCastExpr(context, loc_, this, type()->decay_type(), cast_kind);
 }
 
-ImplicitCastExpr *Expr::implicit_cast(Type *to, CastKind cast_kind) {
-  return new ImplicitCastExpr(loc_, this, to, cast_kind);
+ImplicitCastExpr *Expr::implicit_cast(ParserContext* context, Type *to, CastKind cast_kind) {
+  return new ImplicitCastExpr(context, loc_, this, to, cast_kind);
 }
 
-ImplicitCastExpr *Expr::to_rvalue() {
-  return new ImplicitCastExpr(loc_, this, type()->remove_qualifier(),
+ImplicitCastExpr *Expr::to_rvalue(ParserContext* context) {
+  return new ImplicitCastExpr(context, loc_, this, type()->remove_qualifier(),
                               CastKind::LVALUE_TO_RVALUE);
 }
 
@@ -239,7 +241,7 @@ std::unique_ptr<Expr> UnaryExpr::create(ParserContext *context, Location loc,
   auto operand = _operand.release();
 
   if (op != UnaryOp::ADDRESS) {
-    operand = operand->decay();
+    operand = operand->decay(context);
   }
 
   bool valid = false;
@@ -314,7 +316,7 @@ BinaryExpr::BinaryExpr(ParserContext *context, Location loc, BinaryOp op,
 
 /* get the larger (more precise) of two arithmetic expression types to upcast to
  */
-static void arithmetic_upcast(Expr *&l, Expr *&r) {
+static void arithmetic_upcast(ParserContext* context, Expr *&l, Expr *&r) {
   Type *lt = l->type();
   Type *rt = r->type();
   Type *u;
@@ -346,13 +348,13 @@ static void arithmetic_upcast(Expr *&l, Expr *&r) {
     if (u != rt) {
       auto cast = rt->convertible_to(lt);
       assert(cast);
-      r = r->implicit_cast(lt, *cast);
+      r = r->implicit_cast(context,lt, *cast);
     }
   } else {
     if (u != lt) {
       auto cast = lt->convertible_to(rt);
       assert(cast);
-      l = l->implicit_cast(rt, *cast);
+      l = l->implicit_cast(context,rt, *cast);
     }
   }
 }
@@ -367,30 +369,30 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
   bool valid = false;
   if (op == BinaryOp::ASSIGN) {
     if (l->value_type() == ValueType::LVALUE && !l->type()->is_const()) {
-      r = r->decay();
+      r = r->decay(context);
       if (r->value_type() != ValueType::RVALUE) {
-        r = r->to_rvalue();
+        r = r->to_rvalue(context);
       }
       if (r->type() == l->type()) {
         valid = true;
       } else {
         auto cast = r->type()->convertible_to(l->type());
         if (cast) {
-          r = r->implicit_cast(l->type(), *cast);
+          r = r->implicit_cast(context,l->type(), *cast);
           valid = true;
         }
       }
     }
   } else {
 
-    l = l->decay();
-    r = r->decay();
+    l = l->decay(context);
+    r = r->decay(context);
 
     if (l->value_type() != ValueType::RVALUE) {
-      l = l->to_rvalue();
+      l = l->to_rvalue(context);
     }
     if (r->value_type() != ValueType::RVALUE) {
-      r = r->to_rvalue();
+      r = r->to_rvalue(context);
     }
     switch (op) {
     case BinaryOp::ASSIGN:
@@ -402,7 +404,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
         valid = true;
       }
       if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
-        arithmetic_upcast(l, r);
+        arithmetic_upcast(context,l, r);
         valid = true;
       }
     } break;
@@ -412,7 +414,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
         valid = true;
       }
       if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
-        arithmetic_upcast(l, r);
+        arithmetic_upcast(context, l, r);
         valid = true;
       }
       break;
@@ -420,7 +422,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
     case BinaryOp::DIV:
     case BinaryOp::MODULUS:
       if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
-        arithmetic_upcast(l, r);
+        arithmetic_upcast(context, l, r);
         valid = true;
       }
       break;
@@ -428,7 +430,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
     case BinaryOp::BIT_OR:
     case BinaryOp::BIT_XOR:
       if (l->type()->is_integral() && r->type()->is_integral()) {
-        arithmetic_upcast(l, r);
+        arithmetic_upcast(context, l, r);
         valid = true;
       }
       break;
@@ -447,17 +449,17 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
         if (lb == rb) {
           valid = true;
           if (l->type() != r->type()) {
-            r->implicit_cast(l->type(), CastKind::POINTER_CAST);
+            r->implicit_cast(context,l->type(), CastKind::POINTER_CAST);
           }
         } else if (lb->is_void() || rb->is_void()) {
           valid = true;
           if (l->type() != r->type()) {
-            r->implicit_cast(l->type(), CastKind::POINTER_CAST);
+            r->implicit_cast(context,l->type(), CastKind::POINTER_CAST);
           }
         }
       }
       if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
-        arithmetic_upcast(l, r);
+        arithmetic_upcast(context, l, r);
         valid = true;
       }
     case BinaryOp::LOGIC_GREATER:
@@ -470,13 +472,13 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
         auto rb = r->type()->base_type()->remove_qualifier();
         if (lb == rb) {
           if (l->type() != r->type()) {
-            r->implicit_cast(l->type(), CastKind::POINTER_CAST);
+            r->implicit_cast(context,l->type(), CastKind::POINTER_CAST);
           }
           valid = true;
         }
       }
       if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
-        arithmetic_upcast(l, r);
+        arithmetic_upcast(context, l, r);
         valid = true;
       }
       break;
@@ -535,7 +537,7 @@ RefExpr::RefExpr(ParserContext *context, Location loc, Decl *decl,
 std::unique_ptr<Expr> RefExpr::create(ParserContext *context, Location loc,
                                       Token *token) {
   std::string name = token->value();
-  Decl *decl = context->lookup_symbol(name);
+  Decl *decl = context->lookup_decl(name);
 
   if (!decl) {
     context->report_error(loc, "Use of undeclared identifier '{}'", name);
@@ -582,9 +584,9 @@ CallExpr::create(ParserContext *context, Location loc,
 
   Expr *c = callee.release();
 
-  c = c->decay();
+  c = c->decay(context);
   if (c->value_type() != ValueType::RVALUE) {
-    c = c->to_rvalue();
+    c = c->to_rvalue(context);
   }
 
   bool valid = false;
@@ -613,9 +615,9 @@ CallExpr::create(ParserContext *context, Location loc,
       auto arg = args[i].release();
       auto param_t = type->param_types()[i];
 
-      arg = arg->decay();
+      arg = arg->decay(context);
       if (arg->value_type() == ValueType::LVALUE) {
-        arg = arg->to_rvalue();
+        arg = arg->to_rvalue(context);
       }
 
       if (arg->type() == param_t) {
@@ -625,7 +627,7 @@ CallExpr::create(ParserContext *context, Location loc,
 
       auto cast = arg->type()->convertible_to(param_t);
       if (cast) {
-        arg = arg->implicit_cast(param_t, *cast);
+        arg = arg->implicit_cast(context,param_t, *cast);
         args[i] = std::unique_ptr<Expr>(arg);
         continue;
       }
@@ -668,13 +670,13 @@ ArraySubscriptExpr::create(ParserContext *context, Location loc,
   Expr *arr0 = arr;
   Expr *s0 = subscript;
 
-  arr = arr->decay();
+  arr = arr->decay(context);
   if (arr->value_type() == ValueType::LVALUE) {
-    arr = arr->to_rvalue();
+    arr = arr->to_rvalue(context);
   }
   /* subscript is not a function pointer or array */
   if (subscript->value_type() == ValueType::LVALUE) {
-    subscript = subscript->to_rvalue();
+    subscript = subscript->to_rvalue(context);
   }
 
   bool valid = false;

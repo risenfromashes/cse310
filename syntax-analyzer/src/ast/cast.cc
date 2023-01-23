@@ -1,13 +1,18 @@
 #include "ast/cast.h"
 #include "ast/type.h"
 
+#include "parser_context.h"
 #include <cassert>
 
-ImplicitCastExpr::ImplicitCastExpr(Location loc, Expr *src_expr,
+ImplicitCastExpr::ImplicitCastExpr(ParserContext* context, Location loc, Expr *src_expr,
                                    Type *dest_type, CastKind kind)
     : Expr(loc, dest_type, ValueType::RVALUE), src_expr_(src_expr),
       dest_type_(dest_type), cast_kind_(kind) {
   type_ = determine_type();
+  if (kind == CastKind::FLOATING_TO_INTEGRAL) {
+    value_type_ = determine_value_type();
+    context->report_warning(loc, "possible loss of data in implicit cast of FLOAT to INT");
+  }
 }
 
 Type *ImplicitCastExpr::determine_type() {

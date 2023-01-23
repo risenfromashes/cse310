@@ -86,9 +86,9 @@ public:
   Type *type();
   ValueType value_type();
 
-  Expr *decay();
-  ImplicitCastExpr *implicit_cast(Type *to, CastKind cast_kind);
-  ImplicitCastExpr *to_rvalue();
+  Expr *decay(ParserContext* context);
+  ImplicitCastExpr *implicit_cast(ParserContext* context, Type *to, CastKind cast_kind);
+  ImplicitCastExpr *to_rvalue(ParserContext* context);
 
 protected:
   Type *type_;

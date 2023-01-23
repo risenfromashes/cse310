@@ -25,7 +25,7 @@ private:
 
 class TypeDecl : public Decl {
 public:
-  TypeDecl(Location loc, std::shared_ptr<Type> type, std::string name);
+  TypeDecl(ParserContext* context, Location loc, std::shared_ptr<Type> type, std::string name);
 
   Type *type() override { return type_.get(); }
 
@@ -35,7 +35,7 @@ protected:
 
 class TypedDecl : public Decl {
 public:
-  TypedDecl(Location loc, Type *type, std::string name);
+  TypedDecl(ParserContext* context, Location loc, Type *type, std::string name);
 
   Type *type() override { return type_; }
 
@@ -45,7 +45,7 @@ protected:
 
 class VarDecl : public TypedDecl {
 public:
-  VarDecl(Location loc, Type *type, std::string name);
+  VarDecl(ParserContext* context, Location loc, Type *type, std::string name);
 
   static std::unique_ptr<VarDecl> create(ParserContext *context, Location loc,
                                          Type *type, std::string name);
@@ -55,7 +55,7 @@ public:
 
 class ParamDecl : public TypedDecl {
 public:
-  ParamDecl(Location loc, Type *type, std::string name);
+  ParamDecl(ParserContext* context, Location loc, Type *type, std::string name);
 
   static std::unique_ptr<ParamDecl> create(ParserContext *context, Location loc,
                                            Type *type, std::string name);
@@ -65,7 +65,7 @@ public:
 
 class FuncDecl : public TypeDecl {
 public:
-  FuncDecl(Location loc, std::shared_ptr<FuncType> type,
+  FuncDecl(ParserContext* context, Location loc, std::shared_ptr<FuncType> type,
            std::vector<std::unique_ptr<ParamDecl>> params, std::string name,
            CompoundStmt *defintion);
 
