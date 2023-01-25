@@ -1,10 +1,13 @@
 #pragma once
 
+#include <cassert>
 #include <memory>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
+
+class Decl;
 
 enum class TypeQualifier { CONST, VOLATILE };
 constexpr int TYPE_QUALIFIER_COUNT = 2;
@@ -171,15 +174,27 @@ private:
 };
 
 class FuncType : public Type {
+  friend class FuncDecl;
+
 public:
   FuncType(Type *ret_type, std::vector<Type *> arg_types);
+  FuncType(Decl *decl, Type *ret_type, std::vector<Type *> arg_types);
 
   bool is_function() { return true; }
   Type *return_type() { return return_type_; }
 
+  Decl *decl() {
+    assert(decl_);
+    return decl_;
+  }
+
   const std::vector<Type *> &param_types() { return param_types_; }
 
 private:
+  void set_decl(Decl *decl) { decl_ = decl; }
+
   Type *return_type_;
   std::vector<Type *> param_types_;
+
+  Decl *decl_;
 };

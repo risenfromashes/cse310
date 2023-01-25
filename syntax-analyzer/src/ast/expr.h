@@ -86,9 +86,12 @@ public:
   Type *type();
   ValueType value_type();
 
-  Expr *decay(ParserContext* context);
-  ImplicitCastExpr *implicit_cast(ParserContext* context, Type *to, CastKind cast_kind);
-  ImplicitCastExpr *to_rvalue(ParserContext* context);
+  Expr *decay(ParserContext *context);
+  ImplicitCastExpr *implicit_cast(ParserContext *context, Type *to,
+                                  CastKind cast_kind);
+  ImplicitCastExpr *to_rvalue(ParserContext *context);
+
+  virtual std::optional<int> const_eval() { return std::nullopt; }
 
 protected:
   Type *type_;
@@ -99,15 +102,22 @@ protected:
 class RecoveryExpr : public Expr {
 public:
   RecoveryExpr(ParserContext *context, Location loc);
+  RecoveryExpr(ParserContext *context, Location loc,
+               std::initializer_list<ASTNode *> nodes);
 
   void add_child(ASTNode *node);
   void add_child(std::unique_ptr<ASTNode> node);
+  void add_children(std::initializer_list<ASTNode *> node);
+  void add_children(std::vector<std::unique_ptr<Expr>> node);
 
   const std::vector<std::unique_ptr<ASTNode>> &children() { return children_; }
 
   void visit(ASTVisitor *visitor) override {
     visitor->visit_recovery_expr(this);
   }
+
+  static bool is_any(std::initializer_list<Expr *> exprs);
+  static bool is_any(const std::vector<std::unique_ptr<Expr>> &exprs);
 
 private:
   static Type *determine_type(ParserContext *context) { return nullptr; }
@@ -128,6 +138,8 @@ public:
 
   Expr *operand() { return operand_.get(); }
   UnaryOp op() { return op_; }
+
+  std::optional<int> const_eval() override;
 
 private:
   static Type *determine_type(UnaryOp op, Expr *operand);
@@ -152,6 +164,8 @@ public:
   BinaryOp op() { return op_; }
 
   void visit(ASTVisitor *visitor) override { visitor->visit_binary_expr(this); }
+
+  std::optional<int> const_eval() override;
 
 private:
   static Type *determine_type(ParserContext *context, BinaryOp op,
@@ -242,6 +256,8 @@ public:
 
   int value() { return value_; }
 
+  std::optional<int> const_eval() override { return value_; }
+
   void visit(ASTVisitor *visitor) override { visitor->visit_int_literal(this); }
 
 private:
@@ -255,6 +271,8 @@ public:
                                       Token *tok);
 
   int value() { return value_; }
+
+  std::optional<int> const_eval() override { return value_; }
 
   void visit(ASTVisitor *visitor) override {
     visitor->visit_char_literal(this);

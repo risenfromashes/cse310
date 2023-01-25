@@ -303,52 +303,52 @@ variable : ID {
 	 ;
 	 
  expression : logic_expression	{
-      $$ = NonTerminal::create(context, @$, "expression", $1);
-      $$->ast = std::move($1->ast);
-      }
+	      $$ = NonTerminal::create(context, @$, "expression", $1);
+	      $$->ast = std::move($1->ast);
+      	}
 	   | variable ASSIGNOP logic_expression {
-      $$ = NonTerminal::create(context, @$, "expression", $1, $2, $3);
-      $$->ast = BinaryExpr::create(context, @$, BinaryOp::ASSIGN, std::move($1->expr())
+	      $$ = NonTerminal::create(context, @$, "expression", $1, $2, $3);
+	      $$->ast = BinaryExpr::create(context, @$, BinaryOp::ASSIGN, std::move($1->expr())
                                               , std::move($3->expr()));
-     } 	
+     	} 	
 	   ;
 			
 logic_expression : rel_expression 	{
-      $$ = NonTerminal::create(context, @$, "logic_expression", $1);
-      $$->ast = std::move($1->ast);
-      }
-		 | rel_expression LOGICOP rel_expression 	{
-      $$ = NonTerminal::create(context, @$, "logic_expression", $1, $2, $3);
-      auto op = $2->value() == "&&" ? BinaryOp::LOGIC_AND : BinaryOp::LOGIC_OR;
-      $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
+	      $$ = NonTerminal::create(context, @$, "logic_expression", $1);
+	      $$->ast = std::move($1->ast);
+      	}
+		| rel_expression LOGICOP rel_expression 	{
+	      $$ = NonTerminal::create(context, @$, "logic_expression", $1, $2, $3);
+	      auto op = from_string<BinaryOp>($2->value());
+	      $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
                                               , std::move($3->expr()));
-     }
-		 ;
+     	}
+		;
 			
 rel_expression	: simple_expression {
-      $$ = NonTerminal::create(context, @$, "rel_expression", $1);
-      $$->ast = std::move($1->ast);
-    }
+	      $$ = NonTerminal::create(context, @$, "rel_expression", $1);
+	      $$->ast = std::move($1->ast);
+    	}
 		| simple_expression RELOP simple_expression	{
 
-      $$ = NonTerminal::create(context, @$, "rel_expression", $1, $2, $3);
-      auto op = get_relop($2->value());
-      $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
+	      $$ = NonTerminal::create(context, @$, "rel_expression", $1, $2, $3);
+	      auto op = from_string<BinaryOp>($2->value());
+	      $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
                                               , std::move($3->expr()));
-    }
+    	}
 		;
 				
 simple_expression : term {
-        $$ = NonTerminal::create(context, @$, "simple_expression", $1);
-        $$->ast = std::move($1->ast);
-      }
-		  | simple_expression ADDOP term {
-        $$ = NonTerminal::create(context, @$, "simple_expression", $1, $2, $3);
-        auto op = $2->value() == "+" ? BinaryOp::ADD : BinaryOp::SUB;
-        $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
-                                              , std::move($3->expr()));
-      } 
-		  ;
+	        $$ = NonTerminal::create(context, @$, "simple_expression", $1);
+	        $$->ast = std::move($1->ast);
+      	}
+	  	| simple_expression ADDOP term {
+	        $$ = NonTerminal::create(context, @$, "simple_expression", $1, $2, $3);
+	        auto op = from_string<BinaryOp>($2->value());
+	        $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
+	                                              , std::move($3->expr()));
+      	} 
+		;
 					
 term :	unary_expression {
         $$ = NonTerminal::create(context, @$, "term", $1);
@@ -356,7 +356,7 @@ term :	unary_expression {
       }
      |  term MULOP unary_expression {
         $$ = NonTerminal::create(context, @$, "term", $1, $2, $3);
-        auto op = $2->value() == "*" ? BinaryOp::MUL : BinaryOp::DIV;
+        auto op = from_string<BinaryOp>($2->value());
         $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
                                               , std::move($3->expr()));
      }  
@@ -364,7 +364,7 @@ term :	unary_expression {
 
 unary_expression : ADDOP unary_expression  {
         $$ = NonTerminal::create(context, @$, "unary_expression", $1, $2);
-        auto op = $1->value() == "+" ? UnaryOp::PLUS : UnaryOp::MINUS;
+        auto op = from_string<UnaryOp>($1->value());
         $$->ast = UnaryExpr::create(context, @$, op, std::move($2->expr()));
       }
 		 | NOT unary_expression {

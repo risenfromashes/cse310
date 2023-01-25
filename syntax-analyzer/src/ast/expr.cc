@@ -5,6 +5,7 @@
 #include "ast/type.h"
 
 #include <cassert>
+#include <iterator>
 
 #include "parser_context.h"
 
@@ -190,7 +191,7 @@ Expr::Expr(Location loc, Type *type, ValueType value_type)
   assert(type);
 }
 
-Expr *Expr::decay(ParserContext* context) {
+Expr *Expr::decay(ParserContext *context) {
   CastKind cast_kind;
   if (type()->is_array()) {
     cast_kind = CastKind::ARRAY_TO_POINTER;
@@ -199,14 +200,16 @@ Expr *Expr::decay(ParserContext* context) {
   } else {
     return this;
   }
-  return new ImplicitCastExpr(context, loc_, this, type()->decay_type(), cast_kind);
+  return new ImplicitCastExpr(context, loc_, this, type()->decay_type(),
+                              cast_kind);
 }
 
-ImplicitCastExpr *Expr::implicit_cast(ParserContext* context, Type *to, CastKind cast_kind) {
+ImplicitCastExpr *Expr::implicit_cast(ParserContext *context, Type *to,
+                                      CastKind cast_kind) {
   return new ImplicitCastExpr(context, loc_, this, to, cast_kind);
 }
 
-ImplicitCastExpr *Expr::to_rvalue(ParserContext* context) {
+ImplicitCastExpr *Expr::to_rvalue(ParserContext *context) {
   return new ImplicitCastExpr(context, loc_, this, type()->remove_qualifier(),
                               CastKind::LVALUE_TO_RVALUE);
 }
@@ -219,9 +222,34 @@ Type *Expr::type() {
 
 ValueType Expr::value_type() { return value_type_; }
 
+bool RecoveryExpr::is_any(std::initializer_list<Expr *> exprs) {
+  for (auto expr : exprs) {
+    if (dynamic_cast<RecoveryExpr *>(expr)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool RecoveryExpr::is_any(const std::vector<std::unique_ptr<Expr>> &exprs) {
+  for (auto &expr : exprs) {
+    if (dynamic_cast<RecoveryExpr *>(expr.get())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 RecoveryExpr::RecoveryExpr(ParserContext *context, Location loc)
     : Expr(loc, context->get_built_in_type(BuiltInTypeName::VOID),
            ValueType::RVALUE) {}
+
+RecoveryExpr::RecoveryExpr(ParserContext *context, Location loc,
+                           std::initializer_list<ASTNode *> nodes)
+    : Expr(loc, context->get_built_in_type(BuiltInTypeName::VOID),
+           ValueType::RVALUE) {
+  add_children(std::move(nodes));
+}
 
 void RecoveryExpr::add_child(std::unique_ptr<ASTNode> node) {
   children_.push_back(std::move(node));
@@ -231,6 +259,18 @@ void RecoveryExpr::add_child(ASTNode *node) {
   children_.push_back(std::unique_ptr<ASTNode>(node));
 }
 
+void RecoveryExpr::add_children(std::initializer_list<ASTNode *> nodes) {
+  for (auto node : nodes) {
+    children_.push_back(std::unique_ptr<ASTNode>(node));
+  }
+}
+
+void RecoveryExpr::add_children(std::vector<std::unique_ptr<Expr>> nodes) {
+  for (auto &node : nodes) {
+    children_.push_back(std::move(node));
+  }
+}
+
 UnaryExpr::UnaryExpr(ParserContext *context, Location loc, UnaryOp op,
                      Expr *operand, Type *type, ValueType value_type)
     : Expr(loc, type, value_type), op_(op), operand_(operand) {}
@@ -238,7 +278,12 @@ UnaryExpr::UnaryExpr(ParserContext *context, Location loc, UnaryOp op,
 std::unique_ptr<Expr> UnaryExpr::create(ParserContext *context, Location loc,
                                         UnaryOp op,
                                         std::unique_ptr<Expr> _operand) {
+
   auto operand = _operand.release();
+
+  if (RecoveryExpr::is_any({operand})) {
+    return std::unique_ptr<Expr>(new RecoveryExpr(context, loc, {operand}));
+  }
 
   if (op != UnaryOp::ADDRESS) {
     operand = operand->decay(context);
@@ -316,7 +361,7 @@ BinaryExpr::BinaryExpr(ParserContext *context, Location loc, BinaryOp op,
 
 /* get the larger (more precise) of two arithmetic expression types to upcast to
  */
-static void arithmetic_upcast(ParserContext* context, Expr *&l, Expr *&r) {
+static void arithmetic_upcast(ParserContext *context, Expr *&l, Expr *&r) {
   Type *lt = l->type();
   Type *rt = r->type();
   Type *u;
@@ -348,13 +393,13 @@ static void arithmetic_upcast(ParserContext* context, Expr *&l, Expr *&r) {
     if (u != rt) {
       auto cast = rt->convertible_to(lt);
       assert(cast);
-      r = r->implicit_cast(context,lt, *cast);
+      r = r->implicit_cast(context, lt, *cast);
     }
   } else {
     if (u != lt) {
       auto cast = lt->convertible_to(rt);
       assert(cast);
-      l = l->implicit_cast(context,rt, *cast);
+      l = l->implicit_cast(context, rt, *cast);
     }
   }
 }
@@ -365,6 +410,10 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
                                          std::unique_ptr<Expr> roperand) {
   auto l = loperand.release();
   auto r = roperand.release();
+
+  if (RecoveryExpr::is_any({l, r})) {
+    return std::unique_ptr<Expr>(new RecoveryExpr(context, loc, {l, r}));
+  }
 
   bool valid = false;
   if (op == BinaryOp::ASSIGN) {
@@ -378,7 +427,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
       } else {
         auto cast = r->type()->convertible_to(l->type());
         if (cast) {
-          r = r->implicit_cast(context,l->type(), *cast);
+          r = r->implicit_cast(context, l->type(), *cast);
           valid = true;
         }
       }
@@ -394,6 +443,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
     if (r->value_type() != ValueType::RVALUE) {
       r = r->to_rvalue(context);
     }
+
     switch (op) {
     case BinaryOp::ASSIGN:
       break;
@@ -404,7 +454,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
         valid = true;
       }
       if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
-        arithmetic_upcast(context,l, r);
+        arithmetic_upcast(context, l, r);
         valid = true;
       }
     } break;
@@ -420,8 +470,23 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
       break;
     case BinaryOp::MUL:
     case BinaryOp::DIV:
-    case BinaryOp::MODULUS:
       if (l->type()->is_arithmetic() && r->type()->is_arithmetic()) {
+        if (auto rv = r->const_eval()) {
+          if (*rv == 0) {
+            context->report_warning(loc, "Division by 0 is undefined");
+          }
+        }
+        arithmetic_upcast(context, l, r);
+        valid = true;
+      }
+      break;
+    case BinaryOp::MODULUS:
+      if (l->type()->is_integral() && r->type()->is_integral()) {
+        if (auto rv = r->const_eval()) {
+          if (*rv == 0) {
+            context->report_warning(loc, "Division by 0 is undefined");
+          }
+        }
         arithmetic_upcast(context, l, r);
         valid = true;
       }
@@ -449,12 +514,12 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
         if (lb == rb) {
           valid = true;
           if (l->type() != r->type()) {
-            r->implicit_cast(context,l->type(), CastKind::POINTER_CAST);
+            r->implicit_cast(context, l->type(), CastKind::POINTER_CAST);
           }
         } else if (lb->is_void() || rb->is_void()) {
           valid = true;
           if (l->type() != r->type()) {
-            r->implicit_cast(context,l->type(), CastKind::POINTER_CAST);
+            r->implicit_cast(context, l->type(), CastKind::POINTER_CAST);
           }
         }
       }
@@ -472,7 +537,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
         auto rb = r->type()->base_type()->remove_qualifier();
         if (lb == rb) {
           if (l->type() != r->type()) {
-            r->implicit_cast(context,l->type(), CastKind::POINTER_CAST);
+            r->implicit_cast(context, l->type(), CastKind::POINTER_CAST);
           }
           valid = true;
         }
@@ -492,6 +557,7 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
   }
 
   if (!valid) {
+
     if (op == BinaryOp::ASSIGN) {
       context->report_error(loc, "Cannot assign {} of type {} to {}",
                             to_string(l->value_type()), l->type()->name(),
@@ -584,6 +650,13 @@ CallExpr::create(ParserContext *context, Location loc,
 
   Expr *c = callee.release();
 
+  if (RecoveryExpr::is_any({c}) || RecoveryExpr::is_any(args)) {
+    auto ret = std::unique_ptr<RecoveryExpr>(new RecoveryExpr(context, loc));
+    ret->add_child(c);
+    ret->add_children(std::move(args));
+    return ret;
+  }
+
   c = c->decay(context);
   if (c->value_type() != ValueType::RVALUE) {
     c = c->to_rvalue(context);
@@ -601,13 +674,20 @@ CallExpr::create(ParserContext *context, Location loc,
     type = dynamic_cast<FuncType *>(c->type()->remove_pointer());
   }
 
-  if (!valid) {
+  if (!valid || !type) {
     context->report_error(loc, "Expression is not callable");
     return callexpr_error(context, loc, c, std::move(args));
   }
 
-  if (args.size() != type->param_types().size()) {
-    context->report_error(loc, "Argument size doesn't match function type");
+  if (args.size() > type->param_types().size()) {
+    context->report_error(
+        loc, "Too many arguments to function '{}' first declared at {}",
+        type->decl()->name(), type->decl()->location());
+    return callexpr_error(context, loc, c, std::move(args));
+  } else if (args.size() < type->param_types().size()) {
+    context->report_error(
+        loc, "Too few arguments to function '{}' first declared at {}",
+        type->decl()->name(), type->decl()->location());
     return callexpr_error(context, loc, c, std::move(args));
   } else {
     auto n = args.size();
@@ -627,7 +707,7 @@ CallExpr::create(ParserContext *context, Location loc,
 
       auto cast = arg->type()->convertible_to(param_t);
       if (cast) {
-        arg = arg->implicit_cast(context,param_t, *cast);
+        arg = arg->implicit_cast(context, param_t, *cast);
         args[i] = std::unique_ptr<Expr>(arg);
         continue;
       }
@@ -635,8 +715,8 @@ CallExpr::create(ParserContext *context, Location loc,
       args[i] = std::unique_ptr<Expr>(arg);
 
       context->report_error(
-          loc, "Argument {} doesn't match parameter type ({} vs {})", i + 1,
-          arg->type()->name(), param_t->name());
+          loc, "Type mismatch for argument {} for function '{}' ({} vs {})",
+          i + 1, type->decl()->name(), arg->type()->name(), param_t->name());
       return callexpr_error(context, loc, c, std::move(args));
     }
   }
@@ -670,6 +750,11 @@ ArraySubscriptExpr::create(ParserContext *context, Location loc,
   Expr *arr0 = arr;
   Expr *s0 = subscript;
 
+  if (RecoveryExpr::is_any({arr, subscript})) {
+    return std::unique_ptr<RecoveryExpr>(
+        new RecoveryExpr(context, loc, {arr, subscript}));
+  }
+
   arr = arr->decay(context);
   if (arr->value_type() == ValueType::LVALUE) {
     arr = arr->to_rvalue(context);
@@ -682,7 +767,7 @@ ArraySubscriptExpr::create(ParserContext *context, Location loc,
   bool valid = false;
 
   if (!arr->type()->is_pointer()) {
-    context->report_error(loc, "Type {} is not subscriptable",
+    context->report_error(loc, "Expression of type {} cannot be subscripted",
                           arr0->type()->name());
     return arrayexpr_error(context, loc, arr, subscript);
   }
@@ -736,4 +821,85 @@ std::unique_ptr<Expr> FloatLiteral::create(ParserContext *context, Location loc,
   auto value = std::atof(tok->value().c_str());
 
   return std::unique_ptr<Expr>(new FloatLiteral(context, loc, value));
+}
+
+std::optional<int> UnaryExpr::const_eval() {
+  if (!operand_->const_eval()) {
+    return std::nullopt;
+  }
+  int val = *operand_->const_eval();
+  switch (op_) {
+  case UnaryOp::PLUS:
+    return +val;
+  case UnaryOp::MINUS:
+    return -val;
+  case UnaryOp::BIT_NEGATE:
+    return ~val;
+  case UnaryOp::LOGIC_NOT:
+    return !val;
+  case UnaryOp::PRE_INC:
+    return ++val;
+  case UnaryOp::PRE_DEC:
+    return --val;
+  case UnaryOp::POST_INC:
+    return ++val;
+  case UnaryOp::POST_DEC:
+    return --val;
+  case UnaryOp::POINTER_DEREF:
+    return std::nullopt;
+  case UnaryOp::ADDRESS:
+    return std::nullopt;
+  }
+  return std::nullopt;
+}
+
+std::optional<int> BinaryExpr::const_eval() {
+  if (!loperand_->const_eval() || !roperand_->const_eval()) {
+    return std::nullopt;
+  }
+
+  int l = *loperand_->const_eval();
+  int r = *roperand_->const_eval();
+
+  switch (op_) {
+  case BinaryOp::ASSIGN:
+    return r;
+  case BinaryOp::ADD:
+    return l + r;
+  case BinaryOp::SUB:
+    return l - r;
+  case BinaryOp::MUL:
+    return l * r;
+  case BinaryOp::DIV:
+    return l / r;
+  case BinaryOp::MODULUS:
+    return l % r;
+  case BinaryOp::BIT_AND:
+    return l & r;
+  case BinaryOp::BIT_OR:
+    return l | r;
+  case BinaryOp::BIT_XOR:
+    return l ^ r;
+  case BinaryOp::BIT_LEFT_SHIFT:
+    return l << r;
+  case BinaryOp::BIT_RIGHT_SHIFT:
+    return l >> r;
+  case BinaryOp::LOGIC_EQUALS:
+    return l == r;
+  case BinaryOp::LOGIC_NOT_EQUALS:
+    return l != r;
+  case BinaryOp::LOGIC_AND:
+    return l && r;
+  case BinaryOp::LOGIC_OR:
+    return l || r;
+  case BinaryOp::LOGIC_GREATER:
+    return l > r;
+  case BinaryOp::LOGIC_GE:
+    return l >= r;
+  case BinaryOp::LOGIC_LESS:
+    return l < r;
+  case BinaryOp::LOGIC_LE:
+    return l <= r;
+  }
+  return std::nullopt;
 }

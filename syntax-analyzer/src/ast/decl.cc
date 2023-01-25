@@ -8,17 +8,21 @@
 Decl::Decl(Location loc, std::string name)
     : ASTNode(loc), name_(std::move(name)) {}
 
-TypeDecl::TypeDecl(ParserContext* context, Location loc, std::shared_ptr<Type> type, std::string name)
+TypeDecl::TypeDecl(ParserContext *context, Location loc,
+                   std::shared_ptr<Type> type, std::string name)
     : Decl(loc, std::move(name)), type_(std::move(type)) {}
 
-TypedDecl::TypedDecl(ParserContext* context, Location loc, Type *type, std::string name)
+TypedDecl::TypedDecl(ParserContext *context, Location loc, Type *type,
+                     std::string name)
     : Decl(loc, std::move(name)), type_(type) {
-      if (type_->is_void()){
-        context->report_error(location(), "Variable or field '{}' declared void", name);
-      }
-    }
+  if (type_->is_void()) {
+    context->report_error(location(), "Variable or field '{}' declared void",
+                          Decl::name());
+  }
+}
 
-VarDecl::VarDecl(ParserContext* context, Location loc, Type *type, std::string name)
+VarDecl::VarDecl(ParserContext *context, Location loc, Type *type,
+                 std::string name)
     : TypedDecl(context, loc, type, std::move(name)) {}
 
 std::unique_ptr<VarDecl> VarDecl::create(ParserContext *context, Location loc,
@@ -27,7 +31,7 @@ std::unique_ptr<VarDecl> VarDecl::create(ParserContext *context, Location loc,
 
   if (!context->insert_symbol(name, SymbolType::VAR, ret)) {
     auto decl = context->lookup_decl(name);
-    if (decl->type() == type){      
+    if (decl->type() == type) {
       context->report_error(loc, "Redefinition of '{}'", name);
     } else {
       context->report_error(loc, "Conflicting types for '{}'", name);
@@ -38,7 +42,8 @@ std::unique_ptr<VarDecl> VarDecl::create(ParserContext *context, Location loc,
   return std::unique_ptr<VarDecl>(ret);
 }
 
-ParamDecl::ParamDecl(ParserContext* context, Location loc, Type *type, std::string name)
+ParamDecl::ParamDecl(ParserContext *context, Location loc, Type *type,
+                     std::string name)
     : TypedDecl(context, loc, type, std::move(name)) {}
 
 std::unique_ptr<ParamDecl> ParamDecl::create(ParserContext *context,
@@ -50,7 +55,8 @@ std::unique_ptr<ParamDecl> ParamDecl::create(ParserContext *context,
   return std::unique_ptr<ParamDecl>(ret);
 }
 
-FuncDecl::FuncDecl(ParserContext* context, Location loc, std::shared_ptr<FuncType> type,
+FuncDecl::FuncDecl(ParserContext *context, Location loc,
+                   std::shared_ptr<FuncType> type,
                    std::vector<std::unique_ptr<ParamDecl>> params,
                    std::string name, CompoundStmt *definition)
     : TypeDecl(context, loc, std::move(type), std::move(name)),
@@ -71,23 +77,27 @@ FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
 
   std::shared_ptr<FuncType> func_type;
   bool valid = false;
+  bool is_first_decl = false;
 
   if (sym) {
     FuncDecl *prev_func = dynamic_cast<FuncDecl *>(sym->decl());
     if (prev_func) {
       func_type = prev_func->func_type();
-      if (func_type->return_type() != ret_type){
-        context->report_error(loc, "Conflicting return type for function '{}'", name);
+      if (func_type->return_type() != ret_type) {
+        context->report_error(loc, "Conflicting return type for function '{}'",
+                              name);
       } else {
-        auto& params = func_type->param_types();
-        if(param_types.size() != params.size()){
-          context->report_error(loc, "Conflicting parameter numbers for function '{}'", name);
-        } else { 
+        auto &params = func_type->param_types();
+        if (param_types.size() != params.size()) {
+          context->report_error(
+              loc, "Conflicting parameter numbers for function '{}'", name);
+        } else {
           auto n = param_types.size();
           valid = true;
-          for(size_t i = 0; i < n; i++) {
+          for (size_t i = 0; i < n; i++) {
             if (param_types[i] != params[i]) {
-              context->report_error(loc, "Conflicting parameter types for function '{}'", name);
+              context->report_error(
+                  loc, "Conflicting parameter types for function '{}'", name);
               valid = false;
               break;
             }
@@ -98,21 +108,29 @@ FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
         context->report_error(loc, "Redefinition of function '{}'", name);
         valid = false;
       }
-    } else {      
-      context->report_error(loc, "'{}' redeclared as different kind of symbol", name);
+    } else {
+      context->report_error(loc, "'{}' redeclared as different kind of symbol",
+                            name);
       func_type = std::make_shared<FuncType>(ret_type, std::move(param_types));
       valid = false;
+      is_first_decl = true;
     }
   } else {
     func_type = std::make_shared<FuncType>(ret_type, std::move(param_types));
     valid = true;
+    is_first_decl = true;
   }
 
-  if(!valid) {
+  if (!valid) {
     name = "invalid " + name;
   }
 
-  auto ret = new FuncDecl(context, loc, func_type, std::move(params), name, definition);
+  auto ret = new FuncDecl(context, loc, func_type, std::move(params), name,
+                          definition);
+
+  if (is_first_decl) {
+    func_type->set_decl(ret);
+  }
 
   if (!sym) {
     context->global_scope()->insert(name, SymbolType::FUNC, ret);

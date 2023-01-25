@@ -1,4 +1,5 @@
 #include "symbol_info.h"
+#include "ast/decl.h"
 
 void SymbolInfo::log(Logger *logger) {
   std::string_view type_str;
@@ -16,5 +17,5 @@ void SymbolInfo::log(Logger *logger) {
     type_str = "type";
     break;
   }
-  logger->write("<{},{}> ", name_, type_str);
+  logger->write("<{},{} [{}]>", name_, type_str, decl_->type()->name());
 }

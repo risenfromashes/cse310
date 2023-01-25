@@ -181,6 +181,11 @@ FuncType::FuncType(Type *ret_type, std::vector<Type *> param_types)
   set_name(std::move(name));
 }
 
+FuncType::FuncType(Decl *decl, Type *ret_type, std::vector<Type *> param_types)
+    : FuncType(ret_type, std::move(param_types)) {
+  set_decl(decl);
+}
+
 std::string_view to_string(CastKind kind) {
   switch (kind) {
   case CastKind::LVALUE_TO_RVALUE:
