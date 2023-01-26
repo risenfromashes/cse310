@@ -57,7 +57,7 @@ void ParserContext::enter_scope() {
   if (current_params()) {
     for (auto &param : *current_params()) {
       if (param->name() == "") {
-        report_error(param->location(), "Nameless param");
+        report_error(param->location(), "Unnamed function parameter");
         continue;
       }
       if (!insert_symbol(param->name(), SymbolType::PARAM, param.get())) {
@@ -85,7 +85,6 @@ void ParserContext::handle_id(const char *lexeme) {
 
 void ParserContext::report_error(int lineno, const char *text,
                                  const char *error_type) {
-
   std::string_view lexeme = text;
   int line = lineno;
   if (std::strcmp(error_type, "UNFINISHED_STRING") == 0) {
@@ -95,7 +94,7 @@ void ParserContext::report_error(int lineno, const char *text,
   if (std::strcmp(error_type, "UNFINISHED_COMMENT") == 0) {
     lexeme = buf_;
   }
-  error_logger_.write("Error at line# {}: {} {}\n", line, error_type, lexeme);
+  error_logger_.write("Line #{}: {} {}\n", line, error_type, lexeme);
   error_count_++;
   buf_.clear();
 }

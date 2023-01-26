@@ -59,7 +59,8 @@ void lyyerror(YYLTYPE t, char *s, ...);
 %nonassoc UNMATCHED_IF
 %nonassoc ELSE
 
-
+%nonassoc LOWER_THAN_SEMICOLON
+%nonassoc SEMICOLON
 
 
 %%
@@ -104,6 +105,8 @@ unit : var_declaration {
      } 
      | error {
         $$ = NonTerminal::create(context, @$, "unit", NonTerminal::error(@1));
+        context->report_syntax_error(@$, "Syntax error at unit declaration");
+        $$->ast = Decls{};
      }
      ;
      
@@ -170,10 +173,13 @@ parameter_list  : parameter_list COMMA type_specifier ID {
         $$ = NonTerminal::create(context, @$, "parameter_list", $1, NonTerminal::error(@2));
         $$->ast = std::move($1->ast);
 	      context->current_params(&$$->paramdecls());
+        context->report_syntax_error(@2, "Syntax error at parameter list of function declaration");
+        
     } 
     | error {
         $$ = NonTerminal::create(context, @$, "parameter_list", NonTerminal::error(@1));
         $$->ast = ParamDecls{};
+        context->report_syntax_error(@1, "Syntax error at parameter list of function declaration");
     }
     ;
 
@@ -247,10 +253,14 @@ declaration_list : declaration_list COMMA ID {
       | declaration_list error {
           $$ = NonTerminal::create(context, @$, "declaration_list", $1, NonTerminal::error(@2));
           $$->ast = std::move($1->ast);
+          context->report_syntax_error(@2, "Syntax error at declaration list of variable declaration");
+          
       }
       | error {
           $$ = NonTerminal::create(context, @$, "declaration_list", NonTerminal::error(@1));
           $$->ast = VarDecls{};
+          context->report_syntax_error(@1, "Syntax error at declaration list of variable declaration");
+          
       }
       ;
  		  
@@ -259,11 +269,6 @@ statements : statement {
           $$->ast = Stmts{};
           $$->stmts().push_back(std::move($1->stmt()));
       }
-      | error SEMICOLON {
-          $$ = NonTerminal::create(context, @$, "statements", NonTerminal::error(@1), $2);
-          $$->ast = Stmts{};
-          $$->stmts().push_back(ExprStmt::create(context, @$, nullptr));
-      } 
 	    | statements statement {
           $$ = NonTerminal::create(context, @$, "statements", $1, $2);
           $$->ast = std::move($1->ast);
@@ -273,9 +278,15 @@ statements : statement {
           $$ = NonTerminal::create(context, @$, "statements", $1, $2);
           $$->ast = std::move($1->ast);
       }
-      | statements error {
-          $$ = NonTerminal::create(context, @$, "statements", $1, NonTerminal::error(@1));
-          $$->ast = std::move($$->ast);
+      | statements error SEMICOLON {
+          $$ = NonTerminal::create(context, @$, "statements", $1, NonTerminal::error(@1), $3);
+          $$->ast = std::move($1->ast);
+          context->report_syntax_error(@2, "Syntax error at expression of expression statement");
+      }
+      | error SEMICOLON {
+          $$ = NonTerminal::create(context, @$, "statements", NonTerminal::error(@1), $2);
+          $$->ast = Stmts{};
+          context->report_syntax_error(@1, "Syntax error at expression of expression statement");       
       }
 	    ;
 	   
@@ -293,7 +304,7 @@ statement : var_declaration {
     }
 	  | FOR LPAREN expression_statement expression_statement expression RPAREN statement {
           $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3, $4, $5, $6, $7);
-          $$->ast = ForStmt::create(context, @$, std::move($3->expr()), std::move($4->expr()), 
+          $$->ast = ForStmt::create(context, @$, std::move($3->stmt()), std::move($4->stmt()), 
                                       std::move($5->expr()));
     }
 	  | IF LPAREN expression RPAREN statement %prec UNMATCHED_IF {
@@ -400,7 +411,7 @@ unary_expression : ADDOP unary_expression  {
         $$->ast = UnaryExpr::create(context, @$, op, std::move($2->expr()));
       }
 		 | NOT unary_expression {
-        $$ = NonTerminal::create(context, @$, "unary_expression", $1);
+        $$ = NonTerminal::create(context, @$, "unary_expression", $1, $2);
         $$->ast = UnaryExpr::create(context, @$, UnaryOp::LOGIC_NOT, std::move($2->expr()));
      } 
 		 | factor {
@@ -463,10 +474,12 @@ arguments : arguments COMMA logic_expression {
         | arguments error {
             $$ = NonTerminal::create(context, @$, "arguments", $1, NonTerminal::error(@2));
             $$->ast = std::move($1->ast);
+            context->report_syntax_error(@2, "Syntax error at argument list of call expression");            
         }
         | error {
             $$ = NonTerminal::create(context, @$, "arguments", NonTerminal::error(@1));
             $$->ast = Exprs{};
+            context->report_syntax_error(@1, "Syntax error at argument list of call expression");            
         }
 	      ;
 

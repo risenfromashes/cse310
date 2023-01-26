@@ -52,7 +52,7 @@ std::unique_ptr<Stmt> IfStmt::create(ParserContext *context, Location loc,
   auto cond = _cond.release();
   auto if_ = _if.release();
   auto else_ = _else.release();
-  assert(cond && if_ && else_);
+  assert(cond && if_);
   cond = cond->decay(context);
   if (cond->value_type() == ValueType::LVALUE) {
     cond = cond->to_rvalue(context);
@@ -89,8 +89,8 @@ ForStmt::ForStmt(Location loc, ExprStmt *init, ExprStmt *cond, Expr *iter)
     : Stmt(loc), init_(init), condition_(cond), iter_(iter) {}
 
 std::unique_ptr<Stmt> ForStmt::create(ParserContext *context, Location loc,
-                                      std::unique_ptr<Expr> _init,
-                                      std::unique_ptr<Expr> _cond,
+                                      std::unique_ptr<Stmt> _init,
+                                      std::unique_ptr<Stmt> _cond,
                                       std::unique_ptr<Expr> _iter) {
   auto init = dynamic_cast<ExprStmt *>(_init.release());
   auto cond = dynamic_cast<ExprStmt *>(_cond.release());

@@ -66,11 +66,11 @@ badcharlit \'\\{illescape}\'
 {ws} { /* do nothing */ }
 
 "\/\/"                         { append(yytext); startline(yylineno); BEGIN(SCMNT); }
-<SCMNT>{crlf}                  { new_token(COMMENT);                  BEGIN(INITIAL); }
+<SCMNT>{crlf}                  { BEGIN(INITIAL); }
 <SCMNT>([^\r\n\\]|\\{crlf})+|. { append(yytext); }
 
-"/*"                       { append(yytext); startline(yylineno);           BEGIN(CMNT); }
-<CMNT>"*/"                 { append(yytext); new_token(MULTI_LINE_COMMENT); BEGIN(INITIAL); }
+"/*"                       { append(yytext); startline(yylineno); BEGIN(CMNT); }
+<CMNT>"*/"                 { append(yytext); BEGIN(INITIAL); }
 <CMNT>([^*\r\n]|{crlf})+|. { append(yytext); }
 <CMNT><<EOF>>              { report("UNFINISHED_COMMENT"); return YYEOF; }
 

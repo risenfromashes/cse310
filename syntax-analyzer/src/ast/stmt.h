@@ -111,8 +111,8 @@ public:
   ForStmt(Location loc, ExprStmt *init, ExprStmt *cond, Expr *inc);
 
   static std::unique_ptr<Stmt> create(ParserContext *context, Location loc,
-                                      std::unique_ptr<Expr> init,
-                                      std::unique_ptr<Expr> loop,
+                                      std::unique_ptr<Stmt> init,
+                                      std::unique_ptr<Stmt> loop,
                                       std::unique_ptr<Expr> incr);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_for_stmt(this); }

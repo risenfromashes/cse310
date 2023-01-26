@@ -33,10 +33,22 @@ public:
     error_logger_.writeln(fmt_string, std::forward<decltype(args)>(args)...);
     error_count_++;
   }
+  template <class... T>
+  void report_syntax_error(Location loc, fmt::format_string<T...> fmt_string,
+                           T &&...args) {
+    static int last_line = -1;
+    // don't print multiple errors on same line
+    if (last_line != loc.start_line()) {
+      error_logger_.write("Line #{}: ", loc.start_line());
+      error_logger_.writeln(fmt_string, std::forward<decltype(args)>(args)...);
+      error_count_++;
+      last_line = loc.start_line();
+    }
+  }
 
   template <class... T>
   void report_warning(Location loc, fmt::format_string<T...> fmt_string,
-                    T &&...args) {
+                      T &&...args) {
     error_logger_.write("Line #{}: ", loc.start_line());
     error_logger_.write("Warning: ");
     error_logger_.writeln(fmt_string, std::forward<decltype(args)>(args)...);
@@ -67,7 +79,7 @@ public:
 
   bool insert_symbol(std::string_view name, SymbolType type, Decl *decl);
   SymbolInfo *lookup_symbol(std::string_view name);
-  Decl* lookup_decl(std::string_view name);
+  Decl *lookup_decl(std::string_view name);
 
   Logger *logger() { return &logger_; }
   Logger *ast_logger() { return &ast_logger_; }
