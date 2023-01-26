@@ -54,6 +54,8 @@ public:
   static NonTerminal *create(ParserContext *context, Location location,
                              std::string_view name, auto &&...child);
 
+  static NonTerminal *error(Location loc);
+
   void print(ParserContext *context, int depth) override;
 
   void add_child(PTNode *child);

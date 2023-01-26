@@ -54,3 +54,8 @@ void Terminal::print(ParserContext *context, int depth) {
 NonTerminal::~NonTerminal() {}
 
 Terminal::~Terminal() { delete token_; }
+
+NonTerminal *NonTerminal::error(Location location) {
+  NonTerminal *ret = new NonTerminal(location, "error");
+  return ret;
+}

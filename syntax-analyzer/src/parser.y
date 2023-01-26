@@ -51,10 +51,16 @@ void lyyerror(YYLTYPE t, char *s, ...);
 %type <non_term> term unary_expression factor variable argument_list arguments 
 
 
+%destructor { delete $$; } <non_term>
+%destructor { delete $$; } <token>
 
 /* precedence rules */
-%nonassoc UNMATCHED_ELSE
+
+%nonassoc UNMATCHED_IF
 %nonassoc ELSE
+
+
+
 
 %%
 
@@ -95,6 +101,9 @@ unit : var_declaration {
         $$ = NonTerminal::create(context, @$, "unit", $1);
         $$->ast = Decls{}; 
         $$->decls().push_back(std::move($1->decl()));
+     } 
+     | error {
+        $$ = NonTerminal::create(context, @$, "unit", NonTerminal::error(@1));
      }
      ;
      
@@ -157,25 +166,31 @@ parameter_list  : parameter_list COMMA type_specifier ID {
 	        $$->paramdecls().push_back(ParamDecl::create(context, @$, $1->type(), ""));
 	        context->current_params(&$$->paramdecls());
     	}
- 		;
+ 		| parameter_list error {
+        $$ = NonTerminal::create(context, @$, "parameter_list", $1, NonTerminal::error(@2));
+        $$->ast = std::move($1->ast);
+	      context->current_params(&$$->paramdecls());
+    } 
+    | error {
+        $$ = NonTerminal::create(context, @$, "parameter_list", NonTerminal::error(@1));
+        $$->ast = ParamDecls{};
+    }
+    ;
 
  		
-compound_statement : LCURL { 
-          context->enter_scope(); 
-          } 
-           statements RCURL {
-          $$ = NonTerminal::create(context, @$, "compound_statement", $1, $3, $4);
-          $$->ast = CompoundStmt::create(context, @$, std::move($3->stmts()));
-          context->exit_scope();
-        }
- 		    | LCURL {
-          context->enter_scope();
-        } RCURL {
+compound_statement :  LCURL { context->enter_scope(); } 
+                      statements RCURL  {
+                              $$ = NonTerminal::create(context, @$, "compound_statement", $1, $3, $4);
+                              $$->ast = CompoundStmt::create(context, @$, std::move($3->stmts()));
+                              context->exit_scope();
+                             }
+ 		    | LCURL { context->enter_scope(); } 
+          RCURL {
           $$ = NonTerminal::create(context, @$, "compound_statement", $1, $3);
           $$->ast = CompoundStmt::create(context, @$, Stmts());
           context->exit_scope();
         }
- 		;
+ 		    ;
  		    
 var_declaration : type_specifier declaration_list SEMICOLON {
           $$ = NonTerminal::create(context, @$, "var_declaration", $1, $2, $3);
@@ -229,6 +244,14 @@ declaration_list : declaration_list COMMA ID {
           $$->vardecls().push_back(
               VarDecl::create(context, @3, type, $1->value()));
       }
+      | declaration_list error {
+          $$ = NonTerminal::create(context, @$, "declaration_list", $1, NonTerminal::error(@2));
+          $$->ast = std::move($1->ast);
+      }
+      | error {
+          $$ = NonTerminal::create(context, @$, "declaration_list", NonTerminal::error(@1));
+          $$->ast = VarDecls{};
+      }
       ;
  		  
 statements : statement {
@@ -236,12 +259,25 @@ statements : statement {
           $$->ast = Stmts{};
           $$->stmts().push_back(std::move($1->stmt()));
       }
-	   | statements statement {
+      | error SEMICOLON {
+          $$ = NonTerminal::create(context, @$, "statements", NonTerminal::error(@1), $2);
+          $$->ast = Stmts{};
+          $$->stmts().push_back(ExprStmt::create(context, @$, nullptr));
+      } 
+	    | statements statement {
           $$ = NonTerminal::create(context, @$, "statements", $1, $2);
           $$->ast = std::move($1->ast);
           $$->stmts().push_back(std::move($2->stmt()));
-     }
-	   ;
+      }
+      | statements SEMICOLON {
+          $$ = NonTerminal::create(context, @$, "statements", $1, $2);
+          $$->ast = std::move($1->ast);
+      }
+      | statements error {
+          $$ = NonTerminal::create(context, @$, "statements", $1, NonTerminal::error(@1));
+          $$->ast = std::move($$->ast);
+      }
+	    ;
 	   
 statement : var_declaration {
           $$ = NonTerminal::create(context, @$, "statement", $1);
@@ -260,7 +296,7 @@ statement : var_declaration {
           $$->ast = ForStmt::create(context, @$, std::move($3->expr()), std::move($4->expr()), 
                                       std::move($5->expr()));
     }
-	  | IF LPAREN expression RPAREN statement %prec UNMATCHED_ELSE {
+	  | IF LPAREN expression RPAREN statement %prec UNMATCHED_IF {
           $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3, $4, $5);
           $$->ast = IfStmt::create(context, @$, std::move($3->expr()), std::move($5->stmt())
                                               , nullptr);
@@ -281,11 +317,7 @@ statement : var_declaration {
     }
 	  ;
 	  
-expression_statement 	: SEMICOLON	{
-          $$ = NonTerminal::create(context, @$, "expression_statement", $1);
-          $$->ast = ExprStmt::create(context, @$, nullptr);
-      }
-			| expression SEMICOLON {
+expression_statement 	: expression SEMICOLON {
           $$ = NonTerminal::create(context, @$, "expression_statement", $1, $2);
           $$->ast = ExprStmt::create(context, @$, std::move($1->expr()));
       }
@@ -310,7 +342,7 @@ variable : ID {
 	      $$ = NonTerminal::create(context, @$, "expression", $1, $2, $3);
 	      $$->ast = BinaryExpr::create(context, @$, BinaryOp::ASSIGN, std::move($1->expr())
                                               , std::move($3->expr()));
-     	} 	
+     	}
 	   ;
 			
 logic_expression : rel_expression 	{
@@ -348,8 +380,8 @@ simple_expression : term {
 	        $$->ast = BinaryExpr::create(context, @$, op, std::move($1->expr())
 	                                              , std::move($3->expr()));
       	} 
-		;
-					
+		  ;
+  
 term :	unary_expression {
         $$ = NonTerminal::create(context, @$, "term", $1);
         $$->ast = std::move($1->ast);
@@ -415,7 +447,7 @@ argument_list : arguments {
 			  | {
             $$ = NonTerminal::create(context, @$, "argument_list");
             $$->ast = Exprs{};
-        }
+        } 
 			  ;
 	
 arguments : arguments COMMA logic_expression {
@@ -427,6 +459,14 @@ arguments : arguments COMMA logic_expression {
             $$ = NonTerminal::create(context, @$, "arguments", $1);
             $$->ast = Exprs{};
             $$->exprs().push_back(std::move($1->expr()));
+        }
+        | arguments error {
+            $$ = NonTerminal::create(context, @$, "arguments", $1, NonTerminal::error(@2));
+            $$->ast = std::move($1->ast);
+        }
+        | error {
+            $$ = NonTerminal::create(context, @$, "arguments", NonTerminal::error(@1));
+            $$->ast = Exprs{};
         }
 	      ;
 
