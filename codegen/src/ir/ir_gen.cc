@@ -5,6 +5,8 @@
 #include "ast/stmt.h"
 #include "ast/type.h"
 
+using std::nullopt;
+
 IRGenerator::IRGenerator(std::ostream &out) : out_file_(out) {
   context_stack_.push(IRGenContext(true));
 }
@@ -55,7 +57,7 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
   VarOrImmediate arg;
   if (const_eval) {
     arg = const_eval.value();
-  } else {
+  } else if (!is_logical(unary_expr->op())) {
     unary_expr->operand()->visit(this);
     arg = current_var_;
   }
@@ -69,6 +71,22 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
     print_ir_instr(IROp::NOT, new_temp(), arg);
     break;
   case LOGIC_NOT:
+    if (const_eval) {
+      if (*const_eval) {
+        if (true_label_) {
+          print_ir_instr(IROp::JMP, true_label_);
+        }
+      } else {
+        if (false_label_) {
+          print_ir_instr(IROp::JMP, false_label_);
+        }
+      }
+    } else {
+      auto t = true_label_;
+      true_label_ = false_label_;
+      false_label_ = t;
+      unary_expr->operand()->visit(this);
+    }
     break;
   case PRE_INC:
     print_ir_instr(IROp::ADD, new_temp(), arg, 1);
@@ -85,14 +103,157 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
     current_var_ = arg;
     break;
   case POINTER_DEREF:
-    print_ir_instr(IROp::DEREF, new_temp(), arg);
+    print_ir_instr(IROp::PTRLD, new_temp(), arg, 0);
     break;
   case ADDRESS:
-    print_ir_instr(IROp::ADDRESS, new_temp(), arg);
+    print_ir_instr(IROp::ADDR, new_temp(), arg);
     break;
   }
 }
-void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {}
+
+void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
+  using enum BinaryOp;
+  auto op = binary_expr->op();
+  auto l = binary_expr->left_operand();
+  auto r = binary_expr->right_operand();
+  auto const_eval1 = l->const_eval();
+  auto const_eval2 = r->const_eval();
+  VarOrImmediate arg1, arg2;
+  if (const_eval1) {
+    arg1 = *const_eval1;
+  } else if (!is_logical(op) && op != ASSIGN) {
+    l->visit(this);
+    arg1 = current_var_;
+  }
+  if (const_eval2) {
+    arg2 = *const_eval2;
+  } else if (!is_logical(op) && op != ASSIGN) {
+    r->visit(this);
+    arg2 = current_var_;
+  }
+
+  switch (binary_expr->op()) {
+  case ASSIGN: {
+    if (auto arr = dynamic_cast<ArraySubscriptExpr *>(l)) {
+      auto cnst = arr->subscript()->const_eval();
+      if (cnst) {
+        arr->array()->visit(this);
+        print_ir_instr(IROp::PTRST, arg2, current_var_, *cnst);
+      } else {
+        arr->array()->visit(this);
+        auto ptr = current_var_;
+        arr->subscript()->visit(this);
+        auto subs = current_var_;
+        print_ir_instr(IROp::PTRST, arg2, ptr, subs);
+      }
+    } else if (auto unry = dynamic_cast<UnaryExpr *>(l)) {
+      if (unry->op() == UnaryOp::POINTER_DEREF) {
+        unry->operand()->visit(this);
+        print_ir_instr(IROp::PTRST, arg2, current_var_, 0);
+      }
+    } else {
+      if (!const_eval1) {
+        l->visit(this);
+        arg1 = current_var_;
+      }
+      if (!const_eval2) {
+        r->visit(this);
+        arg2 = current_var_;
+      }
+      print_ir_instr(IROp::COPY, arg1, arg2);
+    }
+  } break;
+  case ADD:
+    print_ir_instr(IROp::ADD, new_temp(), arg1, arg2);
+    break;
+  case SUB:
+    print_ir_instr(IROp::SUB, new_temp(), arg1, arg2);
+    break;
+  case MUL:
+    print_ir_instr(IROp::MUL, new_temp(), arg1, arg2);
+    break;
+  case DIV:
+    print_ir_instr(IROp::DIV, new_temp(), arg1, arg2);
+    break;
+  case MODULUS:
+    print_ir_instr(IROp::MOD, new_temp(), arg1, arg2);
+    break;
+  case BIT_AND:
+    print_ir_instr(IROp::AND, new_temp(), arg1, arg2);
+    break;
+  case BIT_OR:
+    print_ir_instr(IROp::OR, new_temp(), arg1, arg2);
+    break;
+  case BIT_XOR:
+    print_ir_instr(IROp::XOR, new_temp(), arg1, arg2);
+    break;
+  case BIT_LEFT_SHIFT:
+    print_ir_instr(IROp::LSHIFT, new_temp(), arg1, arg2);
+    break;
+  case BIT_RIGHT_SHIFT:
+    print_ir_instr(IROp::RSHIFT, new_temp(), arg1, arg2);
+    break;
+  case LOGIC_EQUALS:
+    print_ir_instr(IROp::EQ, new_temp(), arg1, arg2);
+    break;
+  case LOGIC_NOT_EQUALS:
+    print_ir_instr(IROp::NEQ, new_temp(), arg1, arg2);
+    break;
+  case LOGIC_AND: {
+    auto t0 = true_label_;
+    auto f0 = false_label_;
+    if (const_eval1 && const_eval2) {
+      if (*const_eval1 && *const_eval2) {
+        if (t0) {
+          print_ir_instr(IROp::JMP, t0);
+        }
+      } else {
+        if (f0) {
+          print_ir_instr(IROp::JMP, f0);
+        }
+      }
+    } else if (const_eval2) {
+      if (*const_eval2) {
+        l->visit(this);
+      } else {
+        if (f0) {
+          print_ir_instr(IROp::JMP, f0);
+        }
+      }
+    } else if (const_eval1) {
+      if (*const_eval1) {
+        r->visit(this);
+      } else {
+        if (f0) {
+          print_ir_instr(IROp::JMP, f0);
+        }
+      }
+    } else {
+      if (f0) {
+        true_label_ = nullopt;
+        false_label_ = f0;
+        l->visit(this);
+
+      } else {
+        true_label_ = nullopt;
+        false_label_ = new_label();
+      }
+    }
+
+  } break;
+  case LOGIC_OR:
+    break;
+  case LOGIC_GREATER:
+    break;
+  case LOGIC_LESS:
+    break;
+  case LOGIC_GE:
+    break;
+  case LOGIC_LE:
+    break;
+  }
+}
+
 void IRGenerator::visit_ref_expr(RefExpr *ref_expr) {}
 void IRGenerator::visit_call_expr(CallExpr *call_expr) {}
 

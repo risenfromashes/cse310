@@ -70,6 +70,15 @@ template <> UnaryOp from_string(std::string_view str) {
   return UnaryOp::PLUS;
 }
 
+bool is_logical(UnaryOp op) {
+  switch (op) {
+  case UnaryOp::LOGIC_NOT:
+    return true;
+  default:
+    return false;
+  }
+}
+
 std::string_view to_string(BinaryOp op) {
   switch (op) {
   case BinaryOp::ASSIGN:
@@ -174,6 +183,23 @@ template <> BinaryOp from_string<BinaryOp>(std::string_view str) {
   }
   assert(false && "INVALID OPERATOR");
   return BinaryOp::ADD;
+}
+
+bool is_logical(BinaryOp op) {
+  using enum BinaryOp;
+  switch (op) {
+  case LOGIC_EQUALS:
+  case LOGIC_NOT_EQUALS:
+  case LOGIC_AND:
+  case LOGIC_OR:
+  case LOGIC_GREATER:
+  case LOGIC_LESS:
+  case LOGIC_GE:
+  case LOGIC_LE:
+    return true;
+  default:
+    return false;
+  }
 }
 
 std::string_view to_string(ValueType type) {

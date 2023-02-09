@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(cse310-assignment-2)
+project(cse310-assignment-4)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -21,7 +21,7 @@ BISON_TARGET(parser src/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.cc
             COMPILE_FLAGS "-Wcounterexamples"
             DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.h)
 
-add_executable(parser
+add_executable(compiler
   src/main.cc
   ${BISON_parser_OUTPUTS}
   ${FLEX_scanner_OUTPUTS}
@@ -57,5 +57,5 @@ add_executable(parser
   src/ast/type.cc
 )
 
-target_link_libraries(parser PRIVATE fmt::fmt)
-target_include_directories(parser PRIVATE src/ ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(compiler PRIVATE fmt::fmt)
+target_include_directories(compiler PRIVATE src/ ${CMAKE_CURRENT_BINARY_DIR})

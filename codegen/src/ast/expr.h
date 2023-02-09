@@ -55,7 +55,10 @@ enum class BinaryOp {
 };
 
 std::string_view to_string(UnaryOp op);
+bool is_logical(UnaryOp);
+
 std::string_view to_string(BinaryOp op);
+bool is_logical(BinaryOp);
 
 template <> UnaryOp from_string<UnaryOp>(std::string_view str);
 template <> BinaryOp from_string<BinaryOp>(std::string_view str);

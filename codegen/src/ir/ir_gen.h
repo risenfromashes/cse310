@@ -79,12 +79,20 @@ private:
     out_file_ << to_string(op) << " " << a1 << ", " << a2 << ", " << a3
               << std::endl;
   }
+  void print_ir_lable(std::string &label) {
+    out_file_ << label << ": " << std::endl;
+  }
+
+  std::string new_label() {
+    int cl = current_label_++;
+    return "L" + std::to_string(cl);
+  }
 
   int current_label_ = 0;
   VarOrImmediate current_var_;
 
-  std::string false_label_;
-  std::string true_label_;
+  std::optional<std::string> false_label_;
+  std::optional<std::string> true_label_;
   std::string next_label_;
 
   std::ostream &out_file_;

@@ -3,6 +3,12 @@
 std::string_view to_string(IROp op) {
   using enum IROp;
   switch (op) {
+  case PTRST:
+    return "PTRST";
+  case PTRLD:
+    return "PTRLD";
+  case COPY:
+    return "COPY";
   case ADD:
     return "ADD";
   case AND:
@@ -19,32 +25,32 @@ std::string_view to_string(IROp op) {
     return "MUL";
   case DIV:
     return "DIV";
-  case MODULUS:
-    return "MODULUS";
-  case LEFT_SHIFT:
-    return "LEFT_SHIFT";
-  case RIGHT_SHIFT:
-    return "RIGHT_SHIFT";
-  case IF:
-    return "IF";
-  case IFNOT:
-    return "IFNOT";
-  case GOTO:
-    return "GOTO";
+  case MOD:
+    return "MOD";
+  case LSHIFT:
+    return "LSHIFT";
+  case RSHIFT:
+    return "RSHIFT";
+  case JMPIF:
+    return "JMPIF";
+  case JMPIFNOT:
+    return "JMPIFNOT";
+  case JMP:
+    return "JMP";
   case LESS:
     return "LESS";
   case LEQ:
     return "LEQ";
-  case GREATER:
-    return "GREATER";
+  case GREAT:
+    return "GREAT";
   case GEQ:
     return "GEQ";
-  case EQUAL:
-    return "EQUAL";
-  case NOTEQUAL:
-    return "NOTEQUAL";
-  case ARRAYALLOC:
-    return "ARRAYALLOC";
+  case EQ:
+    return "EQ";
+  case NEQ:
+    return "NEQ";
+  case AALLOC:
+    return "AALLOC";
   case GLOBAL:
     return "GLOBAL";
   case PARAM:
@@ -57,10 +63,8 @@ std::string_view to_string(IROp op) {
     return "RET";
   case LABEL:
     return "LABEL";
-  case ADDRESS:
-    return "ADDRESS";
-  case DEREF:
-    return "DEREF";
+  case ADDR:
+    return "ADDR";
   }
   return "";
 }
