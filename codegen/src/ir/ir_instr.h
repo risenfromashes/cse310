@@ -28,6 +28,7 @@ enum class IROp {
   GEQ,
   EQ,
   NEQ,
+  ALLOC,
   AALLOC,
   GLOBAL,
   PARAM,

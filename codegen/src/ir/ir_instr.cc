@@ -49,6 +49,8 @@ std::string_view to_string(IROp op) {
     return "EQ";
   case NEQ:
     return "NEQ";
+  case ALLOC:
+    return "ALLOC";
   case AALLOC:
     return "AALLOC";
   case GLOBAL:

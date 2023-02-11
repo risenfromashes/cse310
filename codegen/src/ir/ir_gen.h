@@ -4,7 +4,6 @@
 #include "ir_instr.h"
 
 struct IRGenContext {
-  int current_temp;
   const bool global_scope;
   IRGenContext(bool global = false) : global_scope(global) {}
 };
@@ -62,7 +61,7 @@ public:
   void visit_float_literal(FloatLiteral *float_literal) override;
 
   VarOrImmediate &new_temp() {
-    int ti = context().current_temp++;
+    int ti = current_temp_++;
     current_var_ = "t" + std::to_string(ti);
     return current_var_;
   }
@@ -79,7 +78,7 @@ private:
     out_file_ << to_string(op) << " " << a1 << ", " << a2 << ", " << a3
               << std::endl;
   }
-  void print_ir_lable(std::string &label) {
+  void print_ir_label(std::string &label) {
     out_file_ << label << ": " << std::endl;
   }
 
@@ -88,8 +87,12 @@ private:
     return "L" + std::to_string(cl);
   }
 
+  bool jump_ = false;
   int current_label_ = 0;
+  int current_temp_ = 0;
   VarOrImmediate current_var_;
+
+  int scope_depth_ = 0;
 
   std::optional<std::string> false_label_;
   std::optional<std::string> true_label_;
