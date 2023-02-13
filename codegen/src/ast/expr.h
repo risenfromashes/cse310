@@ -44,14 +44,14 @@ enum class BinaryOp {
   BIT_XOR,
   BIT_LEFT_SHIFT,
   BIT_RIGHT_SHIFT,
-  LOGIC_EQUALS,
-  LOGIC_NOT_EQUALS,
   LOGIC_AND,
   LOGIC_OR,
-  LOGIC_GREATER,
-  LOGIC_LESS,
-  LOGIC_GE,
-  LOGIC_LE,
+  REL_EQUALS,
+  REL_NOT_EQUALS,
+  REL_GREATER,
+  REL_LESS,
+  REL_GE,
+  REL_LE,
 };
 
 std::string_view to_string(UnaryOp op);
@@ -59,24 +59,25 @@ bool is_logical(UnaryOp);
 
 std::string_view to_string(BinaryOp op);
 bool is_logical(BinaryOp);
+bool is_relational(BinaryOp);
 
 template <> UnaryOp from_string<UnaryOp>(std::string_view str);
 template <> BinaryOp from_string<BinaryOp>(std::string_view str);
 
 inline BinaryOp get_relop(std::string_view op) {
   if (op == ">=")
-    return BinaryOp::LOGIC_GE;
+    return BinaryOp::REL_GE;
   if (op == "<=")
-    return BinaryOp::LOGIC_LE;
+    return BinaryOp::REL_LE;
   if (op == "<")
-    return BinaryOp::LOGIC_LESS;
+    return BinaryOp::REL_LESS;
   if (op == ">")
-    return BinaryOp::LOGIC_GREATER;
+    return BinaryOp::REL_GREATER;
   if (op == "==")
-    return BinaryOp::LOGIC_EQUALS;
+    return BinaryOp::REL_EQUALS;
   if (op == "!=")
-    return BinaryOp::LOGIC_NOT_EQUALS;
-  return BinaryOp::LOGIC_EQUALS;
+    return BinaryOp::REL_NOT_EQUALS;
+  return BinaryOp::REL_EQUALS;
 }
 
 class ImplicitCastExpr;

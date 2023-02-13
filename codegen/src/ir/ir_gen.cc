@@ -16,6 +16,21 @@ VarOrImmediate::VarOrImmediate(std::string var) : data_(std::move(var)) {}
 VarOrImmediate::VarOrImmediate(int64_t imd) : data_(imd) {}
 VarOrImmediate::VarOrImmediate(double imd) : data_(imd) {}
 
+std::string &VarOrImmediate::str() {
+  assert(std::holds_alternative<std::string>(data_));
+  return std::get<std::string>(data_);
+}
+
+int64_t &VarOrImmediate::int_imd() {
+  assert(std::holds_alternative<int64_t>(data_));
+  return std::get<int64_t>(data_);
+}
+
+double &VarOrImmediate::double_imd() {
+  assert(std::holds_alternative<double>(data_));
+  return std::get<double>(data_);
+}
+
 std::ostream &operator<<(std::ostream &os, const VarOrImmediate &a) {
   if (std::holds_alternative<std::string>(a.data_)) {
     os << std::get<std::string>(a.data_);
@@ -25,6 +40,17 @@ std::ostream &operator<<(std::ostream &os, const VarOrImmediate &a) {
     os << std::get<double>(a.data_);
   }
   return os;
+}
+
+void IRGenerator::gen_conditional_jump() {
+  if (false_label_ && true_label_) {
+    print_ir_instr(IROp::JMPIF, false_label_);
+    print_ir_instr(IROp::JMP, true_label_);
+  } else if (false_label_) {
+    print_ir_instr(IROp::JMPIF, false_label_);
+  } else {
+    print_ir_instr(IROp::JMPIFNOT, true_label_);
+  }
 }
 
 void IRGenerator::visit_decl_stmt(DeclStmt *decl_stmt) {
@@ -162,11 +188,11 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
     break;
   case POST_INC:
     print_ir_instr(IROp::ADD, new_temp(), arg, 1);
-    current_var_ = arg;
+    current_var_ = arg.str();
     break;
   case POST_DEC:
     print_ir_instr(IROp::SUB, new_temp(), arg, 1);
-    current_var_ = arg;
+    current_var_ = arg.str();
     break;
   case POINTER_DEREF:
     print_ir_instr(IROp::PTRLD, new_temp(), arg, 0);
@@ -217,15 +243,31 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
 
   if (const_eval1) {
     arg1 = *const_eval1;
-  } else if (!is_logical(op) && op != ASSIGN) {
+  } else if (!is_logical(op) && !is_relational(op) && op != ASSIGN) {
     l->visit(this);
     arg1 = current_var_;
   }
+
   if (const_eval2) {
     arg2 = *const_eval2;
-  } else if (!is_logical(op) && op != ASSIGN) {
+  } else if (!is_logical(op) && !is_relational(op) && op != ASSIGN) {
     r->visit(this);
     arg2 = current_var_;
+  }
+
+  std::string next;
+  std::string t;
+
+  if (!j0) {
+    if (is_logical(op) || is_relational(op)) {
+      next = new_label();
+      t = new_temp();
+      print_ir_instr(IROp::COPY, t, 0);
+      if (is_logical(op)) {
+        true_label_ = nullopt;
+        false_label_ = next;
+      }
+    }
   }
 
   switch (binary_expr->op()) {
@@ -259,6 +301,7 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
       print_ir_instr(IROp::COPY, arg1, arg2);
     }
   } break;
+
   case ADD:
     print_ir_instr(IROp::ADD, new_temp(), arg1, arg2);
     break;
@@ -289,10 +332,10 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
   case BIT_RIGHT_SHIFT:
     print_ir_instr(IROp::RSHIFT, new_temp(), arg1, arg2);
     break;
-  case LOGIC_EQUALS:
+  case REL_EQUALS:
     print_ir_instr(IROp::EQ, new_temp(), arg1, arg2);
     break;
-  case LOGIC_NOT_EQUALS:
+  case REL_NOT_EQUALS:
     print_ir_instr(IROp::NEQ, new_temp(), arg1, arg2);
     break;
   case LOGIC_AND: {
@@ -378,47 +421,38 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
       }
     }
   } break;
-  case LOGIC_GREATER:
+  case REL_GREATER:
     print_ir_instr(IROp::GREAT, new_temp(), arg1, arg2);
     break;
-  case LOGIC_LESS:
+  case REL_LESS:
     print_ir_instr(IROp::LESS, new_temp(), arg1, arg2);
     break;
-  case LOGIC_GE:
+  case REL_GE:
     print_ir_instr(IROp::GEQ, new_temp(), arg1, arg2);
     break;
-  case LOGIC_LE:
+  case REL_LE:
     print_ir_instr(IROp::LEQ, new_temp(), arg1, arg2);
     break;
   }
 
   if (j0 && !is_logical(op)) {
     print_ir_instr(IROp::EQ, current_var_, 0);
-    if (false_label_ && true_label_) {
-      print_ir_instr(IROp::JMPIF, false_label_);
-      print_ir_instr(IROp::JMP, true_label_);
-    } else if (false_label_) {
-      print_ir_instr(IROp::JMPIF, false_label_);
-    } else {
-      print_ir_instr(IROp::JMPIFNOT, true_label_);
-    }
+    gen_conditional_jump();
   }
-  if (is_logical(op)) {
+  if (is_relational(op)) {
     if (j0) {
-      if (false_label_ && true_label_) {
-        print_ir_instr(IROp::JMPIF, false_label_);
-        print_ir_instr(IROp::JMP, true_label_);
-      } else if (false_label_) {
-        print_ir_instr(IROp::JMPIF, false_label_);
-      } else {
-        print_ir_instr(IROp::JMPIFNOT, true_label_);
-      }
+      gen_conditional_jump();
     } else {
-      auto next = new_label();
-      auto t = new_temp();
-      print_ir_instr(IROp::COPY, t, 0);
       print_ir_instr(IROp::EQ, current_var_, 0);
       print_ir_instr(IROp::JMPIF, next);
+      print_ir_instr(IROp::COPY, t, 1);
+      print_ir_label(next);
+      current_var_ = t;
+    }
+  }
+
+  if (is_logical(op)) {
+    if (!j0) {
       print_ir_instr(IROp::COPY, t, 1);
       print_ir_label(next);
       current_var_ = t;

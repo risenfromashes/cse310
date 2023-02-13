@@ -22,6 +22,10 @@ public:
 
   friend std::ostream &operator<<(std::ostream &os, const VarOrImmediate &a);
 
+  std::string &str();
+  int64_t &int_imd();
+  double &double_imd();
+
 private:
   std::variant<std::string, int64_t, double> data_;
 };
@@ -60,7 +64,7 @@ public:
   void visit_char_literal(CharLiteral *char_literal) override;
   void visit_float_literal(FloatLiteral *float_literal) override;
 
-  VarOrImmediate &new_temp() {
+  std::string &new_temp() {
     int ti = current_temp_++;
     current_var_ = "t" + std::to_string(ti);
     return current_var_;
@@ -87,10 +91,12 @@ private:
     return "L" + std::to_string(cl);
   }
 
+  void gen_conditional_jump();
+
   bool jump_ = false;
   int current_label_ = 0;
   int current_temp_ = 0;
-  VarOrImmediate current_var_;
+  std::string current_var_;
 
   int scope_depth_ = 0;
 

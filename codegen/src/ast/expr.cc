@@ -103,21 +103,21 @@ std::string_view to_string(BinaryOp op) {
     return "<<";
   case BinaryOp::BIT_RIGHT_SHIFT:
     return ">>";
-  case BinaryOp::LOGIC_EQUALS:
+  case BinaryOp::REL_EQUALS:
     return "==";
-  case BinaryOp::LOGIC_NOT_EQUALS:
+  case BinaryOp::REL_NOT_EQUALS:
     return "!=";
   case BinaryOp::LOGIC_AND:
     return "&&";
   case BinaryOp::LOGIC_OR:
     return "||";
-  case BinaryOp::LOGIC_GREATER:
+  case BinaryOp::REL_GREATER:
     return ">";
-  case BinaryOp::LOGIC_GE:
+  case BinaryOp::REL_GE:
     return ">=";
-  case BinaryOp::LOGIC_LESS:
+  case BinaryOp::REL_LESS:
     return "<";
-  case BinaryOp::LOGIC_LE:
+  case BinaryOp::REL_LE:
     return "<=";
   }
   return "";
@@ -158,10 +158,10 @@ template <> BinaryOp from_string<BinaryOp>(std::string_view str) {
     return BinaryOp::BIT_RIGHT_SHIFT;
   }
   if (str == "==") {
-    return BinaryOp::LOGIC_EQUALS;
+    return BinaryOp::REL_EQUALS;
   }
   if (str == "!=") {
-    return BinaryOp::LOGIC_NOT_EQUALS;
+    return BinaryOp::REL_NOT_EQUALS;
   }
   if (str == "&&") {
     return BinaryOp::LOGIC_AND;
@@ -170,16 +170,16 @@ template <> BinaryOp from_string<BinaryOp>(std::string_view str) {
     return BinaryOp::LOGIC_OR;
   }
   if (str == ">") {
-    return BinaryOp::LOGIC_GREATER;
+    return BinaryOp::REL_GREATER;
   }
   if (str == ">=") {
-    return BinaryOp::LOGIC_GE;
+    return BinaryOp::REL_GE;
   }
   if (str == "<") {
-    return BinaryOp::LOGIC_LESS;
+    return BinaryOp::REL_LESS;
   }
   if (str == "<=") {
-    return BinaryOp::LOGIC_LE;
+    return BinaryOp::REL_LE;
   }
   assert(false && "INVALID OPERATOR");
   return BinaryOp::ADD;
@@ -188,14 +188,23 @@ template <> BinaryOp from_string<BinaryOp>(std::string_view str) {
 bool is_logical(BinaryOp op) {
   using enum BinaryOp;
   switch (op) {
-  case LOGIC_EQUALS:
-  case LOGIC_NOT_EQUALS:
   case LOGIC_AND:
   case LOGIC_OR:
-  case LOGIC_GREATER:
-  case LOGIC_LESS:
-  case LOGIC_GE:
-  case LOGIC_LE:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool is_relational(BinaryOp op) {
+  using enum BinaryOp;
+  switch (op) {
+  case REL_GE:
+  case REL_LE:
+  case REL_LESS:
+  case REL_GREATER:
+  case REL_EQUALS:
+  case REL_NOT_EQUALS:
     return true;
   default:
     return false;
@@ -532,8 +541,8 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
         valid = true;
       }
       break;
-    case BinaryOp::LOGIC_EQUALS:
-    case BinaryOp::LOGIC_NOT_EQUALS:
+    case BinaryOp::REL_EQUALS:
+    case BinaryOp::REL_NOT_EQUALS:
       if (l->type()->is_pointer() && r->type()->is_pointer()) {
         auto lb = l->type()->base_type()->remove_qualifier();
         auto rb = r->type()->base_type()->remove_qualifier();
@@ -553,10 +562,10 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
         arithmetic_upcast(context, l, r);
         valid = true;
       }
-    case BinaryOp::LOGIC_GREATER:
-    case BinaryOp::LOGIC_LESS:
-    case BinaryOp::LOGIC_GE:
-    case BinaryOp::LOGIC_LE:
+    case BinaryOp::REL_GREATER:
+    case BinaryOp::REL_LESS:
+    case BinaryOp::REL_GE:
+    case BinaryOp::REL_LE:
       if (l->type()->is_pointer() && r->type()->is_pointer()) {
         // compare base type
         auto lb = l->type()->base_type()->remove_qualifier();
@@ -609,8 +618,8 @@ std::unique_ptr<Expr> BinaryExpr::create(ParserContext *context, Location loc,
 Type *BinaryExpr::determine_type(ParserContext *context, BinaryOp op_,
                                  Expr *loperand_, Expr *roperand_) {
   switch (op_) {
-  case BinaryOp::LOGIC_EQUALS:
-  case BinaryOp::LOGIC_NOT_EQUALS:
+  case BinaryOp::REL_EQUALS:
+  case BinaryOp::REL_NOT_EQUALS:
   case BinaryOp::LOGIC_AND:
   case BinaryOp::LOGIC_OR:
     return context->get_built_in_type(BuiltInTypeName::INT);
@@ -910,21 +919,21 @@ std::optional<int> BinaryExpr::const_eval() {
     return l << r;
   case BinaryOp::BIT_RIGHT_SHIFT:
     return l >> r;
-  case BinaryOp::LOGIC_EQUALS:
+  case BinaryOp::REL_EQUALS:
     return l == r;
-  case BinaryOp::LOGIC_NOT_EQUALS:
+  case BinaryOp::REL_NOT_EQUALS:
     return l != r;
   case BinaryOp::LOGIC_AND:
     return l && r;
   case BinaryOp::LOGIC_OR:
     return l || r;
-  case BinaryOp::LOGIC_GREATER:
+  case BinaryOp::REL_GREATER:
     return l > r;
-  case BinaryOp::LOGIC_GE:
+  case BinaryOp::REL_GE:
     return l >= r;
-  case BinaryOp::LOGIC_LESS:
+  case BinaryOp::REL_LESS:
     return l < r;
-  case BinaryOp::LOGIC_LE:
+  case BinaryOp::REL_LE:
     return l <= r;
   }
   return std::nullopt;
