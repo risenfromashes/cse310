@@ -44,12 +44,12 @@ std::ostream &operator<<(std::ostream &os, const VarOrImmediate &a) {
 
 void IRGenerator::gen_conditional_jump() {
   if (false_label_ && true_label_) {
-    print_ir_instr(IROp::JMPIF, false_label_);
-    print_ir_instr(IROp::JMP, true_label_);
+    print_ir_instr(IROp::JMPIF, current_var_, false_label_);
+    print_ir_instr(IROp::JMP, current_var_, true_label_);
   } else if (false_label_) {
-    print_ir_instr(IROp::JMPIF, false_label_);
+    print_ir_instr(IROp::JMPIF, current_var_, false_label_);
   } else {
-    print_ir_instr(IROp::JMPIFNOT, true_label_);
+    print_ir_instr(IROp::JMPIFNOT, current_var_, true_label_);
   }
 }
 
@@ -60,11 +60,13 @@ void IRGenerator::visit_decl_stmt(DeclStmt *decl_stmt) {
 }
 
 void IRGenerator::visit_expr_stmt(ExprStmt *expr_stmt) {
-  expr_stmt->visit(this);
+  jump_ = false;
+  expr_stmt->expr()->visit(this);
 }
 
 void IRGenerator::visit_compound_stmt(CompoundStmt *compound_stmt) {
   scope_depth_++;
+  /* alloc variables first */
   for (auto &stmt : compound_stmt->stmts()) {
     if (dynamic_cast<DeclStmt *>(stmt.get())) {
       stmt->visit(this);
@@ -104,9 +106,46 @@ void IRGenerator::visit_if_stmt(IfStmt *if_stmt) {
     print_ir_label(f);
   }
 }
-void IRGenerator::visit_while_stmt(WhileStmt *while_stmt) {}
-void IRGenerator::visit_for_stmt(ForStmt *for_stmt) {}
-void IRGenerator::visit_return_stmt(ReturnStmt *return_stmt) {}
+
+void IRGenerator::visit_while_stmt(WhileStmt *while_stmt) {
+  auto begin = new_label();
+  auto exit = new_label();
+
+  print_ir_label(begin);
+  true_label_ = nullopt;
+  false_label_ = exit;
+  jump_ = true;
+  while_stmt->condition()->visit(this);
+  while_stmt->body()->visit(this);
+  print_ir_instr(IROp::JMP, begin);
+  print_ir_label(exit);
+}
+
+void IRGenerator::visit_for_stmt(ForStmt *for_stmt) {
+  auto begin = new_label();
+  auto exit = new_label();
+  for_stmt->init_expr()->visit(this);
+  print_ir_label(begin);
+  true_label_ = nullopt;
+  false_label_ = exit;
+  jump_ = true;
+  for_stmt->loop_condition()->visit(this);
+  for_stmt->body()->visit(this);
+  jump_ = false;
+  for_stmt->iteration_expr()->visit(this);
+  print_ir_instr(IROp::JMP, begin);
+  print_ir_label(exit);
+}
+
+void IRGenerator::visit_return_stmt(ReturnStmt *return_stmt) {
+  if (return_stmt->expr()) {
+    jump_ = false;
+    return_stmt->expr()->visit(this);
+    print_ir_instr(IROp::RET, current_var_);
+  } else {
+    print_ir_instr(IROp::RET, "void");
+  }
+}
 
 void IRGenerator::visit_func_decl(FuncDecl *func_decl) {}
 void IRGenerator::visit_param_decl(ParamDecl *param_decl) {}
@@ -130,8 +169,25 @@ void IRGenerator::visit_translation_unit_decl(TranslationUnitDecl *trans_decl) {
 void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
   using enum UnaryOp;
   auto const_eval = unary_expr->operand()->const_eval();
+  auto t0 = true_label_;
+  auto f0 = false_label_;
   bool j0 = jump_;
   auto op = unary_expr->op();
+
+  if (auto cnst = unary_expr->const_eval()) {
+    if (j0) {
+      if (*cnst && t0) {
+        print_ir_instr(IROp::JMP, t0);
+      }
+      if (*cnst && f0) {
+        print_ir_instr(IROp::JMP, f0);
+      }
+    } else {
+      print_ir_instr(IROp::COPY, new_temp(), *cnst);
+    }
+    return;
+  }
+
   /* don't generate jumps by default*/
   jump_ = false;
 
@@ -155,23 +211,10 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
     break;
   case LOGIC_NOT:
     if (j0) {
-      if (const_eval) {
-        if (*const_eval) {
-          if (true_label_) {
-            print_ir_instr(IROp::JMP, true_label_);
-          }
-        } else {
-          if (false_label_) {
-            print_ir_instr(IROp::JMP, false_label_);
-          }
-        }
-      } else {
-        auto t = true_label_;
-        true_label_ = false_label_;
-        false_label_ = t;
-        jump_ = true;
-        unary_expr->operand()->visit(this);
-      }
+      true_label_ = f0;
+      false_label_ = t0;
+      jump_ = true;
+      unary_expr->operand()->visit(this);
     } else {
       if (const_eval) {
         print_ir_instr(IROp::COPY, new_temp(), (*const_eval ? 0 : 1));
@@ -202,23 +245,18 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
     break;
   }
   if (j0 && !is_logical(op)) {
-    print_ir_instr(IROp::EQ, current_var_, 0);
-    if (false_label_ && true_label_) {
-      print_ir_instr(IROp::JMPIF, false_label_);
-      print_ir_instr(IROp::JMP, true_label_);
-    } else if (false_label_) {
-      print_ir_instr(IROp::JMPIF, false_label_);
-    } else {
-      print_ir_instr(IROp::JMPIFNOT, true_label_);
-    }
+    arg = current_var_;
+    print_ir_instr(IROp::EQ, new_temp(), arg, 0);
+    gen_conditional_jump();
   }
   if (!j0 && is_logical(op)) {
     if (!const_eval) {
       auto next = new_label();
       auto t = new_temp();
+      arg = current_var_;
       print_ir_instr(IROp::COPY, t, 0);
-      print_ir_instr(IROp::EQ, current_var_, 0);
-      print_ir_instr(IROp::JMPIF, next);
+      print_ir_instr(IROp::EQ, new_temp(), arg, 0);
+      print_ir_instr(IROp::JMPIF, current_var_, next);
       print_ir_instr(IROp::COPY, t, 1);
       print_ir_label(next);
       current_var_ = t;
@@ -240,6 +278,20 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
 
   auto t0 = true_label_;
   auto f0 = false_label_;
+
+  if (auto cnst = binary_expr->const_eval()) {
+    if (j0) {
+      if (*cnst && t0) {
+        print_ir_instr(IROp::JMP, t0);
+      }
+      if (*cnst && f0) {
+        print_ir_instr(IROp::JMP, f0);
+      }
+    } else {
+      print_ir_instr(IROp::COPY, new_temp(), *cnst);
+    }
+    return;
+  }
 
   if (const_eval1) {
     arg1 = *const_eval1;
@@ -436,15 +488,15 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
   }
 
   if (j0 && !is_logical(op)) {
-    print_ir_instr(IROp::EQ, current_var_, 0);
+    auto &arg = current_var_;
+    print_ir_instr(IROp::EQ, new_temp(), arg, 0);
     gen_conditional_jump();
   }
   if (is_relational(op)) {
     if (j0) {
       gen_conditional_jump();
     } else {
-      print_ir_instr(IROp::EQ, current_var_, 0);
-      print_ir_instr(IROp::JMPIF, next);
+      print_ir_instr(IROp::JMPIF, current_var_, next);
       print_ir_instr(IROp::COPY, t, 1);
       print_ir_label(next);
       current_var_ = t;
@@ -464,7 +516,8 @@ void IRGenerator::visit_array_subscript_expr(ArraySubscriptExpr *arr) {
   auto cnst = arr->subscript()->const_eval();
   if (cnst) {
     arr->array()->visit(this);
-    print_ir_instr(IROp::PTRLD, new_temp(), current_var_, *cnst);
+    auto &arg = current_var_;
+    print_ir_instr(IROp::PTRLD, new_temp(), arg, *cnst);
   } else {
     arr->array()->visit(this);
     auto ptr = current_var_;

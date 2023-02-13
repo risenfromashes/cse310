@@ -85,21 +85,23 @@ std::unique_ptr<Stmt> WhileStmt::create(ParserContext *context, Location loc,
   return std::unique_ptr<Stmt>(new WhileStmt(loc, cond, body));
 }
 
-ForStmt::ForStmt(Location loc, ExprStmt *init, ExprStmt *cond, Expr *iter)
+ForStmt::ForStmt(Location loc, ExprStmt *init, ExprStmt *cond, Expr *iter,
+                 Stmt *body)
     : Stmt(loc), init_(init), condition_(cond), iter_(iter) {}
 
 std::unique_ptr<Stmt> ForStmt::create(ParserContext *context, Location loc,
                                       std::unique_ptr<Stmt> _init,
                                       std::unique_ptr<Stmt> _cond,
-                                      std::unique_ptr<Expr> _iter) {
+                                      std::unique_ptr<Expr> _iter,
+                                      std::unique_ptr<Stmt> _body) {
   auto init = dynamic_cast<ExprStmt *>(_init.release());
   auto cond = dynamic_cast<ExprStmt *>(_cond.release());
   auto iter = _iter.release();
-  assert(init && cond && iter);
+  auto body = _body.release();
   if (!cond->expr()->type()->is_scalar()) {
     context->report_error(loc, "For loop condition is not scalar");
   }
-  return std::unique_ptr<Stmt>(new ForStmt(loc, init, cond, iter));
+  return std::unique_ptr<Stmt>(new ForStmt(loc, init, cond, iter, body));
 }
 
 ReturnStmt::ReturnStmt(Location loc, Expr *expr) : Stmt(loc), expr_(expr) {}

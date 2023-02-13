@@ -108,23 +108,26 @@ private:
 
 class ForStmt : public Stmt {
 public:
-  ForStmt(Location loc, ExprStmt *init, ExprStmt *cond, Expr *inc);
+  ForStmt(Location loc, ExprStmt *init, ExprStmt *cond, Expr *inc, Stmt *body);
 
   static std::unique_ptr<Stmt> create(ParserContext *context, Location loc,
                                       std::unique_ptr<Stmt> init,
                                       std::unique_ptr<Stmt> loop,
-                                      std::unique_ptr<Expr> incr);
+                                      std::unique_ptr<Expr> incr,
+                                      std::unique_ptr<Stmt> body);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_for_stmt(this); }
 
   ExprStmt *init_expr() { return init_.get(); }
   ExprStmt *loop_condition() { return condition_.get(); }
   Expr *iteration_expr() { return iter_.get(); }
+  Stmt *body() { return body_.get(); }
 
 private:
   std::unique_ptr<ExprStmt> init_;
   std::unique_ptr<ExprStmt> condition_;
   std::unique_ptr<Expr> iter_;
+  std::unique_ptr<Stmt> body_;
 };
 
 class ReturnStmt : public Stmt {

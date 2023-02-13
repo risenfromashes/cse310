@@ -305,7 +305,7 @@ statement : var_declaration {
 	  | FOR LPAREN expression_statement expression_statement expression RPAREN statement {
           $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3, $4, $5, $6, $7);
           $$->ast = ForStmt::create(context, @$, std::move($3->stmt()), std::move($4->stmt()), 
-                                      std::move($5->expr()));
+                                      std::move($5->expr()), std::move($7->stmt()));
     }
 	  | IF LPAREN expression RPAREN statement %prec UNMATCHED_IF {
           $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3, $4, $5);
