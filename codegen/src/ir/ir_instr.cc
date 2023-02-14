@@ -103,6 +103,7 @@ std::ostream &operator<<(std::ostream &os, const IRArg &arg) {
     os << arg.get_float();
     return os;
   }
+  return os;
 }
 
 IRInstr::IRInstr(IROp op) : op_(op) {}

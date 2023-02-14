@@ -2,9 +2,7 @@
 
 #include <fstream>
 
-constexpr const char *built_in_headers = R"(
-    void println(int);
-  )";
+constexpr const char *built_in_headers = R"(void println(int);)";
 
 void preprocess(const char *_in, const char *_out) {
   std::ifstream in(_in);

@@ -1,5 +1,6 @@
 #include <stack>
 
+#include "ast/ast_node.h"
 #include "ast/ast_visitor.h"
 #include "ir_instr.h"
 
@@ -75,17 +76,36 @@ public:
 
 private:
   IRGenContext &context() { return context_stack_.top(); }
-  void print_ir_instr(IROp op, auto &&a1) {
-    out_file_ << to_string(op) << " " << a1 << std::endl;
+  void print_tab(IROp op) {
+    switch (op) {
+    case IROp::PROC:
+    case IROp::GLOBAL:
+      break;
+    default:
+      out_file_ << "\t";
+    }
   }
 
-  void print_ir_instr(IROp op, auto &&a1, auto &&a2) {
-    out_file_ << to_string(op) << " " << a1 << ", " << a2 << std::endl;
+  void print_src_loc(ASTNode *node) {
+    out_file_ << "\t\t; line #" << node->location().start_line() << std::endl;
   }
 
-  void print_ir_instr(IROp op, auto &&a1, auto &&a2, auto &&a3) {
-    out_file_ << to_string(op) << " " << a1 << ", " << a2 << ", " << a3
-              << std::endl;
+  void print_ir_instr(IROp op, auto &&a1, ASTNode *n) {
+    print_tab(op);
+    out_file_ << to_string(op) << " " << a1;
+    print_src_loc(n);
+  }
+
+  void print_ir_instr(IROp op, auto &&a1, auto &&a2, ASTNode *n) {
+    print_tab(op);
+    out_file_ << to_string(op) << " " << a1 << ", " << a2;
+    print_src_loc(n);
+  }
+
+  void print_ir_instr(IROp op, auto &&a1, auto &&a2, auto &&a3, ASTNode *n) {
+    print_tab(op);
+    out_file_ << to_string(op) << " " << a1 << ", " << a2 << ", " << a3;
+    print_src_loc(n);
   }
 
   void print_ir_label(std::string &label) {
@@ -97,7 +117,8 @@ private:
     return "L" + std::to_string(cl);
   }
 
-  void gen_conditional_jump();
+  void gen_conditional_jump(ASTNode *n);
+  void gen_expr_jump(ASTNode *n);
 
   bool jump_ = false;
   int current_label_ = 0;
