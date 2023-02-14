@@ -5,6 +5,8 @@
 #include <optional>
 #include <tuple>
 
+#include "codegen/8086/preprocessor.h"
+#include "ir/ir_gen.h"
 #include "log.h"
 #include "parser_context.h"
 #include "symbol_table.h"
@@ -23,7 +25,8 @@ int main(int argc, char **argv) {
   std::FILE *in = std::fopen(in_file, "r");
 
   if (in) {
-    ParserContext context(in);
+    preprocess(in_file, "cp.c");
+    ParserContext context(std::fopen("cp.c", "r"));
     context.set_ast_logger_file("ast.txt");
     context.set_pt_logger_file("pt.txt");
     context.set_logger_file("log.txt");
@@ -31,6 +34,8 @@ int main(int argc, char **argv) {
     context.parse();
     context.print_ast();
     context.print_pt();
+    IRGenerator ir_gen("ir.txt");
+    ir_gen.generate(context.ast_root());
   } else {
     fmt::print(stderr, "Couldn't access input file: {}", in_file);
   }

@@ -19,13 +19,18 @@ public:
   virtual Type *type() = 0;
   std::string_view name() { return name_; }
 
+  void ir_var(int var) { ir_var_ = var; }
+  int ir_var() { return ir_var_; }
+
 private:
   std::string name_;
+  int ir_var_ = 0;
 };
 
 class TypeDecl : public Decl {
 public:
-  TypeDecl(ParserContext* context, Location loc, std::shared_ptr<Type> type, std::string name);
+  TypeDecl(ParserContext *context, Location loc, std::shared_ptr<Type> type,
+           std::string name);
 
   Type *type() override { return type_.get(); }
 
@@ -35,7 +40,7 @@ protected:
 
 class TypedDecl : public Decl {
 public:
-  TypedDecl(ParserContext* context, Location loc, Type *type, std::string name);
+  TypedDecl(ParserContext *context, Location loc, Type *type, std::string name);
 
   Type *type() override { return type_; }
 
@@ -45,7 +50,7 @@ protected:
 
 class VarDecl : public TypedDecl {
 public:
-  VarDecl(ParserContext* context, Location loc, Type *type, std::string name);
+  VarDecl(ParserContext *context, Location loc, Type *type, std::string name);
 
   static std::unique_ptr<VarDecl> create(ParserContext *context, Location loc,
                                          Type *type, std::string name);
@@ -55,7 +60,7 @@ public:
 
 class ParamDecl : public TypedDecl {
 public:
-  ParamDecl(ParserContext* context, Location loc, Type *type, std::string name);
+  ParamDecl(ParserContext *context, Location loc, Type *type, std::string name);
 
   static std::unique_ptr<ParamDecl> create(ParserContext *context, Location loc,
                                            Type *type, std::string name);
@@ -65,7 +70,7 @@ public:
 
 class FuncDecl : public TypeDecl {
 public:
-  FuncDecl(ParserContext* context, Location loc, std::shared_ptr<FuncType> type,
+  FuncDecl(ParserContext *context, Location loc, std::shared_ptr<FuncType> type,
            std::vector<std::unique_ptr<ParamDecl>> params, std::string name,
            CompoundStmt *defintion);
 
@@ -75,8 +80,6 @@ public:
          std::unique_ptr<Stmt> definition = nullptr);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_func_decl(this); }
-
-  std::string_view name() { return name_; }
 
   std::shared_ptr<FuncType> func_type() {
     return std::dynamic_pointer_cast<FuncType>(type_);
@@ -90,7 +93,6 @@ public:
 
 private:
   std::vector<std::unique_ptr<ParamDecl>> params_;
-  std::string name_;
   std::unique_ptr<CompoundStmt> definition_;
 };
 

@@ -55,6 +55,12 @@ add_executable(compiler
   src/ast/decl.cc
   src/ast/type.h
   src/ast/type.cc
+  src/codegen/8086/preprocessor.h
+  src/codegen/8086/preprocessor.cc
+  src/ir/ir_gen.h
+  src/ir/ir_gen.cc
+  src/ir/ir_instr.h
+  src/ir/ir_instr.cc
 )
 
 target_link_libraries(compiler PRIVATE fmt::fmt)

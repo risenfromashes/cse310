@@ -6,11 +6,15 @@
 #include "ast/stmt.h"
 #include "ast/type.h"
 
+#include <fstream>
+
 using std::nullopt;
 
-IRGenerator::IRGenerator(std::ostream &out) : out_file_(out) {
+IRGenerator::IRGenerator(const char *file) : out_file_(file) {
   context_stack_.push(IRGenContext(true));
 }
+
+void IRGenerator::generate(ASTNode *node) { node->visit(this); }
 
 VarOrImmediate::VarOrImmediate(std::string var) : data_(std::move(var)) {}
 VarOrImmediate::VarOrImmediate(int64_t imd) : data_(imd) {}
@@ -44,12 +48,12 @@ std::ostream &operator<<(std::ostream &os, const VarOrImmediate &a) {
 
 void IRGenerator::gen_conditional_jump() {
   if (false_label_ && true_label_) {
-    print_ir_instr(IROp::JMPIF, current_var_, false_label_);
-    print_ir_instr(IROp::JMP, current_var_, true_label_);
+    print_ir_instr(IROp::JMPIF, current_var_, *false_label_);
+    print_ir_instr(IROp::JMP, current_var_, *true_label_);
   } else if (false_label_) {
-    print_ir_instr(IROp::JMPIF, current_var_, false_label_);
+    print_ir_instr(IROp::JMPIF, current_var_, *false_label_);
   } else {
-    print_ir_instr(IROp::JMPIFNOT, current_var_, true_label_);
+    print_ir_instr(IROp::JMPIFNOT, current_var_, *true_label_);
   }
 }
 
@@ -147,23 +151,63 @@ void IRGenerator::visit_return_stmt(ReturnStmt *return_stmt) {
   }
 }
 
-void IRGenerator::visit_func_decl(FuncDecl *func_decl) {}
-void IRGenerator::visit_param_decl(ParamDecl *param_decl) {}
+void IRGenerator::visit_func_decl(FuncDecl *func_decl) {
+  if (func_decl->definition()) {
+    print_ir_instr(IROp::PROC, func_decl->name());
+    for (auto &param : func_decl->params()) {
+      param->visit(this);
+    }
+    func_decl->definition()->visit(this);
+  }
+}
 
-void IRGenerator::visit_ref_expr(RefExpr *ref_expr) {}
-void IRGenerator::visit_call_expr(CallExpr *call_expr) {}
+void IRGenerator::visit_param_decl(ParamDecl *param_decl) {
+  int v = current_temp_;
+  param_decl->ir_var(v);
+  print_ir_instr(IROp::PARAM, new_temp());
+}
+
+void IRGenerator::visit_ref_expr(RefExpr *ref_expr) {
+  if (ref_expr->type()->is_function()) {
+    current_var_ = ref_expr->name();
+  } else if (ref_expr->decl()->ir_var()) {
+    current_var_ = "%" + std::to_string(ref_expr->decl()->ir_var());
+  } else {
+    /* global */
+    current_var_ = ref_expr->name();
+  }
+}
+
+void IRGenerator::visit_call_expr(CallExpr *call_expr) {
+  std::vector<std::string> args;
+  for (auto &arg : call_expr->arguments()) {
+    jump_ = false;
+    arg->visit(this);
+    args.push_back(current_var_);
+  }
+  for (auto &arg : args) {
+    print_ir_instr(IROp::PARAM, arg);
+  }
+  jump_ = false;
+  call_expr->callee()->visit(this);
+  print_ir_instr(IROp::CALL, current_var_);
+}
 
 void IRGenerator::visit_var_decl(VarDecl *var_decl) {
   if (scope_depth_ == 0) {
     print_ir_instr(IROp::GLOBAL, var_decl->name());
     current_var_ = var_decl->name();
   } else {
-    print_ir_instr(IROp::ALLOC, new_temp(), var_decl->name());
+    int v = current_temp_;
+    print_ir_instr(IROp::ALLOC, new_temp());
+    var_decl->ir_var(v);
   }
 }
 
 void IRGenerator::visit_translation_unit_decl(TranslationUnitDecl *trans_decl) {
-  trans_decl->visit(this);
+  for (auto &unit : trans_decl->decl_units()) {
+    unit->visit(this);
+  }
 }
 
 void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
@@ -177,10 +221,10 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
   if (auto cnst = unary_expr->const_eval()) {
     if (j0) {
       if (*cnst && t0) {
-        print_ir_instr(IROp::JMP, t0);
+        print_ir_instr(IROp::JMP, *t0);
       }
       if (*cnst && f0) {
-        print_ir_instr(IROp::JMP, f0);
+        print_ir_instr(IROp::JMP, *f0);
       }
     } else {
       print_ir_instr(IROp::COPY, new_temp(), *cnst);
@@ -282,10 +326,10 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
   if (auto cnst = binary_expr->const_eval()) {
     if (j0) {
       if (*cnst && t0) {
-        print_ir_instr(IROp::JMP, t0);
+        print_ir_instr(IROp::JMP, *t0);
       }
       if (*cnst && f0) {
-        print_ir_instr(IROp::JMP, f0);
+        print_ir_instr(IROp::JMP, *f0);
       }
     } else {
       print_ir_instr(IROp::COPY, new_temp(), *cnst);
@@ -295,14 +339,14 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
 
   if (const_eval1) {
     arg1 = *const_eval1;
-  } else if (!is_logical(op) && !is_relational(op) && op != ASSIGN) {
+  } else if (!is_logical(op) && op != ASSIGN) {
     l->visit(this);
     arg1 = current_var_;
   }
 
   if (const_eval2) {
     arg2 = *const_eval2;
-  } else if (!is_logical(op) && !is_relational(op) && op != ASSIGN) {
+  } else if (!is_logical(op) && op != ASSIGN) {
     r->visit(this);
     arg2 = current_var_;
   }
@@ -396,7 +440,7 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
         l->visit(this);
       } else {
         if (f0) {
-          print_ir_instr(IROp::JMP, f0);
+          print_ir_instr(IROp::JMP, *f0);
         }
       }
     } else if (const_eval1) {
@@ -404,7 +448,7 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
         r->visit(this);
       } else {
         if (f0) {
-          print_ir_instr(IROp::JMP, f0);
+          print_ir_instr(IROp::JMP, *f0);
         }
       }
     } else {
@@ -436,7 +480,7 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
     if (const_eval2) {
       if (*const_eval2) {
         if (t0) {
-          print_ir_instr(IROp::JMP, t0);
+          print_ir_instr(IROp::JMP, *t0);
         }
       } else {
         l->visit(this);
@@ -444,7 +488,7 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
     } else if (const_eval1) {
       if (*const_eval1) {
         if (t0) {
-          print_ir_instr(IROp::JMP, t0);
+          print_ir_instr(IROp::JMP, *t0);
         }
       } else {
         r->visit(this);
@@ -530,7 +574,7 @@ void IRGenerator::visit_array_subscript_expr(ArraySubscriptExpr *arr) {
 void IRGenerator::visit_implicit_cast_expr(
     ImplicitCastExpr *implicit_cast_expr) {
   /* don't handle any casts for now */
-  implicit_cast_expr->visit(this);
+  implicit_cast_expr->source_expr()->visit(this);
 }
 
 void IRGenerator::visit_recovery_expr(RecoveryExpr *recovery_expr) {}

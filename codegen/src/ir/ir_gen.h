@@ -3,6 +3,8 @@
 #include "ast/ast_visitor.h"
 #include "ir_instr.h"
 
+#include <fstream>
+
 struct IRGenContext {
   const bool global_scope;
   IRGenContext(bool global = false) : global_scope(global) {}
@@ -32,7 +34,8 @@ private:
 
 class IRGenerator : public ASTVisitor {
 public:
-  IRGenerator(std::ostream &out = std::cout);
+  IRGenerator(const char *file);
+  void generate(ASTNode *node);
 
   void visit_node(ASTNode *node) {}
 
@@ -66,7 +69,7 @@ public:
 
   std::string &new_temp() {
     int ti = current_temp_++;
-    current_var_ = "t" + std::to_string(ti);
+    current_var_ = "%" + std::to_string(ti);
     return current_var_;
   }
 
@@ -75,13 +78,16 @@ private:
   void print_ir_instr(IROp op, auto &&a1) {
     out_file_ << to_string(op) << " " << a1 << std::endl;
   }
+
   void print_ir_instr(IROp op, auto &&a1, auto &&a2) {
     out_file_ << to_string(op) << " " << a1 << ", " << a2 << std::endl;
   }
+
   void print_ir_instr(IROp op, auto &&a1, auto &&a2, auto &&a3) {
     out_file_ << to_string(op) << " " << a1 << ", " << a2 << ", " << a3
               << std::endl;
   }
+
   void print_ir_label(std::string &label) {
     out_file_ << label << ": " << std::endl;
   }
@@ -95,7 +101,7 @@ private:
 
   bool jump_ = false;
   int current_label_ = 0;
-  int current_temp_ = 0;
+  int current_temp_ = 1;
   std::string current_var_;
 
   int scope_depth_ = 0;
@@ -104,7 +110,7 @@ private:
   std::optional<std::string> true_label_;
   std::string next_label_;
 
-  std::ostream &out_file_;
+  std::ofstream out_file_;
 
   std::stack<IRGenContext> context_stack_;
 };

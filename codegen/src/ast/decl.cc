@@ -66,6 +66,7 @@ std::unique_ptr<FuncDecl>
 FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
                  std::vector<std::unique_ptr<ParamDecl>> params,
                  std::string name, std::unique_ptr<Stmt> _definition) {
+  std::cerr << "creating function: " << name << std::endl;
   std::vector<Type *> param_types;
   auto definition = dynamic_cast<CompoundStmt *>(_definition.release());
 
