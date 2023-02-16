@@ -164,7 +164,8 @@ void IRGenerator::visit_return_stmt(ReturnStmt *return_stmt) {
 void IRGenerator::visit_func_decl(FuncDecl *func_decl) {
   auto n = func_decl;
   if (func_decl->definition()) {
-    print_ir_instr(IROp::PROC, func_decl->name(), n);
+    auto name = "@" + std::string(func_decl->name());
+    print_ir_instr(IROp::PROC, name, n);
     for (auto &param : func_decl->params()) {
       param->visit(this);
     }
@@ -181,12 +182,12 @@ void IRGenerator::visit_param_decl(ParamDecl *param_decl) {
 
 void IRGenerator::visit_ref_expr(RefExpr *ref_expr) {
   if (ref_expr->type()->is_function()) {
-    current_var_ = ref_expr->name();
+    current_var_ = "@" + std::string(ref_expr->name());
   } else if (ref_expr->decl()->ir_var()) {
     current_var_ = "%" + std::to_string(ref_expr->decl()->ir_var());
   } else {
     /* global */
-    current_var_ = ref_expr->name();
+    current_var_ = "@" + std::string(ref_expr->name());
   }
 }
 
@@ -209,8 +210,9 @@ void IRGenerator::visit_call_expr(CallExpr *call_expr) {
 void IRGenerator::visit_var_decl(VarDecl *var_decl) {
   auto n = var_decl;
   if (scope_depth_ == 0) {
-    print_ir_instr(IROp::GLOBAL, var_decl->name(), n);
-    current_var_ = var_decl->name();
+    auto name = "@" + std::string(var_decl->name());
+    print_ir_instr(IROp::GLOBAL, name, n);
+    current_var_ = name;
   } else {
     int v = current_temp_;
     print_ir_instr(IROp::ALLOC, new_temp(), n);

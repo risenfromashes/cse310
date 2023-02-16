@@ -1,8 +1,11 @@
+#pragma once
+
 #include <cassert>
 #include <iostream>
 #include <optional>
 #include <string>
 #include <variant>
+#include <vector>
 
 enum class IROp {
   PTRST,
@@ -41,68 +44,61 @@ enum class IROp {
 
 std::string_view to_string(IROp op);
 
+bool is_jump(IROp op);
+
 class IRInstr;
 
-class IRAddr {
+class IRLabel {
 public:
-  IRAddr(std::string name);
-  std::string_view name() const { return name_; }
+  IRLabel(int id) : id_(id) {}
+
+private:
+  int id_;
+};
+
+class IRGlobal {
+public:
+  IRGlobal(std::string name) : name_(name) {}
+  std::string_view name() { return name_; }
 
 private:
   std::string name_;
 };
 
-class IRLabel : public IRAddr {
+class IRVar {
 public:
-  IRLabel(int idx);
-  IRLabel(std::string name);
-
-  friend std::ostream &operator<<(std::ostream &os, const IRLabel &label);
-};
-
-class IRVar : public IRAddr {
-public:
-  IRVar(std::string name, IRInstr *decl);
+  IRVar(int id) : id_(id) {}
 
 private:
-  IRInstr *decl_;
+  int id_;
 };
 
-enum class IRArgType {
-  VARIABLE,
-  IMD_INT,
-  IMD_FLOAT,
-};
+enum class IRArgType { VARIABLE, IMD_INT, IMD_FLOAT, LABEL, GLOBAL };
 
 class IRArg {
 public:
-  IRArg(IRAddr *var);
+  IRArg(IRLabel *label);
+  IRArg(IRVar *var);
+  IRArg(IRGlobal *global);
   IRArg(int64_t imd);
   IRArg(double imd);
 
-  bool is_immediate() const { return !std::holds_alternative<IRAddr *>(data_); }
+  bool is_label();
+  bool is_global();
+  bool is_var();
+  bool is_imd_int();
+  bool is_imd_double();
 
-  IRAddr *get_var() const {
-    assert(!is_immediate());
-    return std::get<IRAddr *>(data_);
-  }
-
-  int64_t get_int() const {
-    assert(std::holds_alternative<int64_t>(data_));
-    return std::get<int64_t>(data_);
-  }
-
-  double get_float() const {
-    assert(std::holds_alternative<double>(data_));
-    return std::get<int64_t>(data_);
-  }
+  IRLabel *label();
+  IRVar *var();
+  IRGlobal *global();
+  int64_t imd_int();
+  double imd_float();
 
   IRArgType type() const { return type_; }
 
-  friend std::ostream &operator<<(std::ostream &os, const IRArg &arg);
-
 private:
-  std::variant<IRAddr *, int64_t, double> data_;
+  std::variant<IRLabel *, IRVar *, IRGlobal *, int64_t, double> data_;
   IRArgType type_;
 };
 
@@ -113,13 +109,14 @@ public:
   IRInstr(IROp op, IRArg opr1, IRArg opr2);
   IRInstr(IROp op, IRArg opr1, IRArg opr2, IRArg opr3);
 
-  friend std::ostream &operator<<(std::ostream &os, const IRInstr &instr);
-
   IROp op() const { return op_; }
 
   IRArg arg1() const;
   IRArg arg2() const;
   IRArg arg3() const;
+
+  std::vector<IRVar *> src_vars();
+  IRVar *dest_var();
 
 private:
   IROp op_;
