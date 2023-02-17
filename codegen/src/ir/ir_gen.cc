@@ -170,6 +170,7 @@ void IRGenerator::visit_func_decl(FuncDecl *func_decl) {
       param->visit(this);
     }
     func_decl->definition()->visit(this);
+    print_ir_instr(IROp::ENDP, name, n);
   }
 }
 
@@ -211,7 +212,12 @@ void IRGenerator::visit_var_decl(VarDecl *var_decl) {
   auto n = var_decl;
   if (scope_depth_ == 0) {
     auto name = "@" + std::string(var_decl->name());
-    print_ir_instr(IROp::GLOBAL, name, n);
+    if (var_decl->type()->is_sized_array()) {
+      auto t = dynamic_cast<SizedArrayType *>(var_decl->type());
+      print_ir_instr(IROp::GLOBALARR, name, t->array_size(), n);
+    } else {
+      print_ir_instr(IROp::GLOBAL, name, n);
+    }
     current_var_ = name;
   } else {
     int v = current_temp_;

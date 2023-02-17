@@ -91,7 +91,8 @@ Type *ArrayType::sized_array(size_t size) {
 }
 
 SizedArrayType::SizedArrayType(Type *base_type, size_t size)
-    : ArrayType(base_type), array_size_(size) {
+    : ArrayType(base_type) {
+  array_size_ = size;
   set_name(std::string(base_type->name()) + "[" + std::to_string(size) + "]");
 }
 

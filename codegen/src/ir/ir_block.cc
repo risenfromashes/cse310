@@ -1,1 +1,65 @@
+#include "ir_block.h"
 
+#include <unordered_map>
+
+IRBlock::IRBlock() : label_(nullptr) {}
+IRBlock::IRBlock(IRLabel *label) : label_(label) { label_->set_block(this); }
+
+void IRBlock::add_successor(IRBlock *block) { succ_.push_back(block); }
+
+void IRBlock::add_predecessor(IRBlock *block) { pred_.push_back(block); }
+
+void IRBlock::add_instr(IRInstr instr) {
+  assert(!sealed_);
+  instrs_.push_back(std::move(instr));
+}
+
+void IRBlock::process() {
+  /* find use and def*/
+  for (auto &instr : instrs_) {
+    auto src_vars = instr.srcs();
+    auto dest_var = instr.dest();
+    for (auto &src : src_vars) {
+      if (!def_.contains(src)) {
+        use_.insert(src);
+      }
+    }
+    if (dest_var) {
+      if (!use_.contains(dest_var)) {
+        def_.insert(dest_var);
+      }
+    }
+  }
+
+  /* find next use info */
+
+  IRInstr::NextUseInfo next_use = live_out_;
+  /* iterate backwards */
+  for (int i = instrs_.size() - 1; i >= 0; i--) {
+    auto &instr = instrs_[i];
+    auto src_vars = instr.srcs();
+    auto dest_var = instr.dest();
+    instr.set_next_use(next_use);
+    if (dest_var) {
+      next_use.erase(dest_var);
+    }
+    for (auto &src : src_vars) {
+      next_use.insert(src);
+    }
+  }
+}
+
+void IRBlock::end_block() {
+  sealed_ = true;
+  process();
+}
+
+const std::vector<IRInstr> &IRBlock::instrs() {
+  assert(!instrs_.empty());
+  return instrs_;
+}
+
+IRInstr &IRBlock::last_instr() {
+  assert(!instrs_.empty());
+  return instrs_.back();
+}

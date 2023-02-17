@@ -77,6 +77,7 @@ public:
   virtual size_t size() { return 0; }
   virtual bool is_function() { return false; }
   virtual bool is_array() { return false; }
+  virtual bool is_sized_array() { return false; }
   virtual bool is_pointer() { return false; }
   virtual bool is_const() { return false; }
 
@@ -149,6 +150,7 @@ class SizedArrayType : public ArrayType {
 public:
   SizedArrayType(Type *base_type, size_t size);
 
+  bool is_sized_array() override { return true; }
   // std::optional<CastKind> convertible_to(Type *to) override;
 
   size_t array_size() { return array_size_; }
