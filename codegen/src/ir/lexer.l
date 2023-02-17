@@ -21,8 +21,8 @@ id ((_|{letter})(_|{alphanum})*)
 %%
 
 {ws}             { }
-
 "\n"             { yyextra->new_line();                          }
+
 PTRST            { yyextra->add_token(IRToken(IROp::PTRST));     }
 PTRLD            { yyextra->add_token(IRToken(IROp::PTRLD));     }
 COPY             { yyextra->add_token(IRToken(IROp::COPY));      }
