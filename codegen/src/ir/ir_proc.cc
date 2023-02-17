@@ -1,6 +1,8 @@
 #include "ir_proc.h"
 #include <algorithm>
 
+IRProc::IRProc(std::string name) : name_(std::move(name)) {}
+
 void IRProc::add_instr(IRInstr instr) {
   assert(!sealed_);
   if (!current_block_) {

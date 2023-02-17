@@ -6,6 +6,8 @@
 
 class IRProc {
 public:
+  IRProc(std::string name);
+
   void add_instr(IRInstr instr);
   void add_label(IRLabel *label);
 

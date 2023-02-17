@@ -1,4 +1,5 @@
 #include "ir_parser.h"
+#include "ir/ir_proc.h"
 
 IRLabel *IRParser::get_label(int id) {
   if (!labels_.contains(id)) {
@@ -14,10 +15,83 @@ IRVar *IRParser::get_var(int id) {
   return vars_.at(id).get();
 }
 
+IRGlobal *IRParser::get_global(std::string name) {
+  if (!globals_.contains(name)) {
+    vars_.emplace(name, std::make_unique<IRGlobal>(name));
+  }
+  return globals_.at(name).get();
+}
+
 void IRParser::new_line() {
   if (current_line_.empty()) {
     return;
   }
-  auto opcode = current_line_[0].opcode();
+  if (current_line_[0].is_opcode()) {
+    auto opcode = current_line_[0].opcode();
+
+    /* global declarations are special cases */
+    switch (opcode) {
+    case IROp::GLOBAL:
+      return;
+    case IROp::GLOBALARR: {
+      assert(current_line_.size() == 3);
+      auto global = current_line_[1].arg().global();
+      auto size = current_line_[2].arg().imd_int();
+      global->set_size(size);
+      return;
+    }
+    case IROp::PROC: {
+      assert(current_line_.size() == 2);
+      auto global = current_line_[1].arg().global();
+      new_proc(global);
+      return;
+    }
+    case IROp::ENDP: {
+      end_proc();
+      return;
+    };
+    default:
+      break;
+    }
+
+    /* otherwise just instruction to current proc */
+    if (current_line_.size() == 2) {
+      add_instr(IRInstr(opcode, current_line_[1].arg()));
+    } else if (current_line_.size() == 3) {
+      add_instr(
+          IRInstr(opcode, current_line_[1].arg(), current_line_[2].arg()));
+    } else if (current_line_.size() == 4) {
+      add_instr(IRInstr(opcode, current_line_[1].arg(), current_line_[2].arg(),
+                        current_line_[3].arg()));
+    }
+  } else {
+    /* must be a label */
+    add_label(current_line_[0].arg().label());
+  }
+
   current_line_.clear();
+}
+
+void IRParser::new_proc(IRGlobal *global) {
+  current_proc_ = std::make_unique<IRProc>(std::string(global->name()));
+}
+
+void IRParser::end_proc() {
+  assert(current_proc_);
+  current_proc_->end_proc();
+  current_proc_ = nullptr;
+}
+
+void IRParser::add_instr(IRInstr instr) {
+  assert(current_proc_);
+  current_proc_->add_instr(std::move(instr));
+}
+
+void IRParser::add_label(IRLabel *label) {
+  assert(current_proc_);
+  current_proc_->add_label(label);
+}
+
+void IRParser::add_token(IRToken token) {
+  current_line_.push_back(std::move(token));
 }

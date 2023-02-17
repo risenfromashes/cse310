@@ -9,17 +9,17 @@ class IRAddress;
 
 class Register {
 public:
-  typedef void (*LoadStoreFunc)(Register *, IRAddress *);
-
-  Register(std::string namne, LoadStoreFunc load, LoadStoreFunc store);
+  Register(std::string name);
 
   void clear();
   void spill();
-  int spill_cost(IRInstr *instr, bool source);
+  int spill_cost(IRInstr *instr);
+
+  virtual void store(IRAddress *addr) = 0;
+  virtual void load(IRAddress *addr) = 0;
 
 private:
   std::set<IRAddress *> addresses_;
 
-  LoadStoreFunc load_, store_;
   std::string name_;
 };

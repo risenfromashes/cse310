@@ -89,12 +89,20 @@ protected:
 };
 
 class IRGlobal : public IRAddress {
+  friend class IRParser;
+
 public:
-  IRGlobal(std::string name) : IRAddress(IRAddressType::GLOBAL), name_(name) {}
+  IRGlobal(std::string name)
+      : IRAddress(IRAddressType::GLOBAL), name_(name), size_(1) {}
+
   std::string_view name() { return name_; }
+  int size() { return size_; }
 
 private:
+  void set_size(int size) { size_ = size; }
+
   std::string name_;
+  int size_;
 };
 
 class IRVar : public IRAddress {

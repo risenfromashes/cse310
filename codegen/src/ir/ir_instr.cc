@@ -5,7 +5,6 @@ bool is_jump(IROp op) {
   case IROp::JMPIF:
   case IROp::JMPIFNOT:
   case IROp::JMP:
-  case IROp::CALL:
   case IROp::RET:
     return true;
   default:
