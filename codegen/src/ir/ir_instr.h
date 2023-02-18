@@ -67,10 +67,18 @@ class Register;
 
 enum class IRAddressType { GLOBAL, LOCAL };
 
+class IRVar;
+class IRGlobal;
 class IRAddress {
 public:
   IRAddress(IRAddressType type) : type_(type) {}
   IRAddressType type() { return type_; }
+
+  bool is_var() { return type_ == IRAddressType::LOCAL; }
+  bool is_global() { return type_ == IRAddressType::GLOBAL; }
+
+  IRVar *var();
+  IRGlobal *global();
 
   void set_dirty(bool dirty) { dirty_ = dirty; }
   bool is_dirty() { return dirty_; }
@@ -109,19 +117,23 @@ class IRVar : public IRAddress {
 public:
   IRVar(int id) : IRAddress(IRAddressType::LOCAL), id_(id) {}
 
-  int size() { return size_; }
+  int size() const { return size_; }
   void set_size(int size) { size_ = size; }
 
   void set_offset(int offset) { offset_ = offset; }
-  bool has_address() { return (bool)offset_; }
-  int offset() {
+  bool has_address() const { return (bool)offset_; }
+  int offset() const {
     assert(has_address());
     return *offset_;
   }
 
+  int use_count() const { return use_; }
+  void add_use() { use_++; }
+
 private:
   int id_;
   int size_;
+  int use_ = 0;
 
   std::optional<int> offset_;
 };

@@ -1,5 +1,6 @@
 #include "ir_block.h"
 
+#include <algorithm>
 #include <unordered_map>
 
 IRBlock::IRBlock() : label_(nullptr) {}
@@ -30,10 +31,28 @@ void IRBlock::process() {
       }
     }
   }
+  ref_.clear();
+  for (auto &addr : use_) {
+    if (addr->is_var()) {
+      ref_.insert(addr->var());
+    }
+  }
+  for (auto &addr : def_) {
+    if (addr->is_var()) {
+      ref_.insert(addr->var());
+    }
+  }
 
+  /* increment usage count */
+  for (auto &var : ref_) {
+    var->add_use();
+  }
+}
+
+void IRBlock::find_next_use() {
   /* find next use info */
-
   IRInstr::NextUseInfo next_use = live_out_;
+
   /* iterate backwards */
   for (int i = instrs_.size() - 1; i >= 0; i--) {
     auto &instr = instrs_[i];
@@ -62,4 +81,30 @@ const std::vector<IRInstr> &IRBlock::instrs() {
 IRInstr &IRBlock::last_instr() {
   assert(!instrs_.empty());
   return instrs_.back();
+}
+
+void IRBlock::alloc_vars() {
+  int max_offset = 0;
+  for (auto &var : var_in_) {
+    assert(var->has_address());
+    max_offset = std::max(max_offset, var->offset());
+  }
+
+  /* to be allocated */
+  std::vector<IRVar *> vars;
+  for (auto &var : first_def_) {
+    /* params could already have address assigned */
+    if (!var->has_address()) {
+      vars.push_back(var);
+    }
+  }
+
+  /* allocate more used vars lower on the stack */
+  std::sort(vars.begin(), vars.end(), [](const IRVar *a, const IRVar *b) {
+    return a->use_count() > b->use_count();
+  });
+
+  for (auto &var : vars) {
+    var->set_offset(max_offset += var->size());
+  }
 }

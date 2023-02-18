@@ -258,3 +258,13 @@ IRAddress *IRInstr::find_dest() {
     return nullptr;
   }
 }
+
+IRVar *IRAddress::var() {
+  assert(is_var());
+  return static_cast<IRVar *>(this);
+}
+
+IRGlobal *IRAddress::global() {
+  assert(is_var());
+  return static_cast<IRGlobal *>(this);
+}

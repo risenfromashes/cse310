@@ -1,5 +1,7 @@
 #include "ir_proc.h"
 #include <algorithm>
+#include <stack>
+#include <unordered_set>
 
 IRProc::IRProc(std::string name) : name_(std::move(name)) {}
 
@@ -43,7 +45,16 @@ void IRProc::add_block() {
   }
 }
 
-void IRProc::process() {
+void IRProc::process() { /* now perform variable use information */
+  find_succ_pre();
+  find_liveness();
+  find_next_use();
+  find_first_defs();
+  find_var_liveness();
+  alloc_vars();
+}
+
+void IRProc::find_succ_pre() {
   /* add successors and predecessors */
   for (int i = 0; i < blocks_.size(); i++) {
     auto &block = blocks_[i];
@@ -82,7 +93,9 @@ void IRProc::process() {
       }
     }
   }
+}
 
+void IRProc::find_liveness() {
   /* now perform liveness analysis */
   bool change = true;
   while (change) {
@@ -104,11 +117,84 @@ void IRProc::process() {
           block->def_.begin(), block->def_.end(),           //
           std::inserter(block->live_in_, block->live_in_.end()));
       /* IN = use ∪ (OUT - def) */
-      block->live_out_.insert(block->use_.begin(), block->use_.end());
+      block->live_in_.insert(block->use_.begin(), block->use_.end());
 
       if (!change) {
         /* check for change */
         if (old_in != block->live_in_) {
+          change = true;
+        }
+      }
+    }
+  }
+}
+
+void IRProc::find_next_use() {
+  /* now find next use of all blocks */
+  for (auto &block : blocks_) {
+    block->find_next_use();
+  }
+}
+
+void IRProc::find_first_defs() {
+  /* now perform dfs to find first defs */
+  if (blocks_.size()) {
+    auto n = blocks_[0].get();
+    std::stack<IRBlock *> stack;
+    stack.push(n);
+    std::set<IRBlock *> visited;
+
+    std::set<IRVar *> vars;
+
+    while (!stack.empty()) {
+      auto c = stack.top();
+      stack.pop();
+
+      if (visited.contains(c)) {
+        continue;
+      }
+      visited.insert(c);
+
+      for (auto &var : c->ref_) {
+        if (!vars.contains(var)) {
+          c->first_def_.insert(var);
+          vars.insert(var);
+        }
+      }
+
+      for (auto &succ : c->succ_) {
+        stack.push(succ);
+      }
+    }
+  }
+}
+
+void IRProc::find_var_liveness() {
+  /* now perform liveness analysis */
+  bool change = true;
+  while (change) {
+    change = false;
+    for (auto &block : blocks_) {
+      /* initialise as empty */
+      block->var_out_.clear();
+      for (auto succ : block->succ_) {
+        /* union of all successor IN */
+        block->var_out_.insert(succ->var_in_.begin(), succ->var_in_.end());
+      }
+
+      /* to check for change */
+      auto old_in = std::move(block->var_in_);
+      block->var_in_.clear();
+      /* ref - first_def */
+      std::set_difference(block->ref_.begin(), block->ref_.end(),             //
+                          block->first_def_.begin(), block->first_def_.end(), //
+                          std::inserter(block->var_in_, block->var_in_.end()));
+      /* IN = OUT ∪ (ref - first_def) */
+      block->var_in_.insert(block->var_out_.begin(), block->var_out_.end());
+
+      if (!change) {
+        /* check for change */
+        if (old_in != block->var_in_) {
           change = true;
         }
       }
