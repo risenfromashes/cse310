@@ -10,8 +10,8 @@ class IRBlock {
   friend class IRProc;
 
 public:
-  IRBlock(IRProc *proc);
-  IRBlock(IRProc *proc, IRLabel *);
+  IRBlock(IRProc *proc, int idx);
+  IRBlock(IRProc *proc, int idx, IRLabel *);
 
   void add_successor(IRBlock *block);
   void add_predecessor(IRBlock *block);
@@ -38,6 +38,7 @@ public:
   int stack_offset() { return stack_offset_; }
 
   IRProc *proc() { return proc_; }
+  int index() { return idx_; }
 
 private:
   IRLabel *label_;
@@ -55,6 +56,8 @@ private:
 
   std::vector<IRInstr> instrs_;
   bool sealed_ = false;
+
+  int idx_;
 
   int stack_offset_;
 

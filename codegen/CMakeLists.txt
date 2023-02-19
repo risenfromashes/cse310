@@ -24,11 +24,17 @@ BISON_TARGET(parser src/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.cc
             COMPILE_FLAGS "-Wcounterexamples"
             DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.h)
 
-add_executable(compiler
-  src/main.cc
+include(FetchContent)
+
+FetchContent_Declare(backward
+        GIT_REPOSITORY https://github.com/bombela/backward-cpp
+        GIT_TAG v1.6)
+FetchContent_MakeAvailable(backward)
+
+add_executable(frontend 
+  src/frontend.cc
   ${BISON_parser_OUTPUTS}
   ${FLEX_scanner_OUTPUTS}
-  ${FLEX_ir_scanner_OUTPUTS}
   src/parser_context.h
   src/parser_context.cc
   src/token.h
@@ -63,6 +69,20 @@ add_executable(compiler
   src/ir/ir_gen.cc
   src/ir/ir_instr.h
   src/ir/ir_instr.cc
+  src/codegen/register.h
+  src/codegen/register.cc
+  src/codegen/8086/preprocessor.h
+  src/codegen/8086/preprocessor.cc
+  ${BACKWARD_ENABLE}
+)
+add_backward(frontend)
+
+
+add_executable(backend8086
+  src/backend8086.cc
+  ${FLEX_ir_scanner_OUTPUTS}
+  src/ir/ir_instr.h
+  src/ir/ir_instr.cc
   src/ir/ir_block.h
   src/ir/ir_block.cc
   src/ir/ir_proc.h
@@ -81,7 +101,13 @@ add_executable(compiler
   src/codegen/8086/preprocessor.cc
   src/codegen/8086/codegen_8086.h
   src/codegen/8086/codegen_8086.cc
+  ${BACKWARD_ENABLE}
 )
+add_backward(backend8086)
 
-target_link_libraries(compiler PRIVATE fmt::fmt)
-target_include_directories(compiler PRIVATE src/ ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(frontend PRIVATE src/ ${CMAKE_CURRENT_BINARY_DIR})
+target_include_directories(backend8086 PRIVATE src/ ${CMAKE_CURRENT_BINARY_DIR})
+
+target_link_libraries(frontend PRIVATE fmt::fmt)
+target_link_libraries(backend8086 PRIVATE fmt::fmt)
+

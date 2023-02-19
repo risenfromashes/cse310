@@ -24,29 +24,29 @@ VarOrImmediate::VarOrImmediate(int64_t imd) : data_(imd) {}
 VarOrImmediate::VarOrImmediate(double imd) : data_(imd) {}
 
 std::string &VarOrImmediate::str() {
-  assert(std::holds_alternative<std::string>(data_));
+  assert(is_str());
   return std::get<std::string>(data_);
 }
 
 int64_t &VarOrImmediate::int_imd() {
-  assert(std::holds_alternative<int64_t>(data_));
+  assert(is_imd_int());
   return std::get<int64_t>(data_);
 }
 
-double &VarOrImmediate::double_imd() {
-  assert(std::holds_alternative<double>(data_));
+double &VarOrImmediate::float_imd() {
+  assert(is_imd_float());
   return std::get<double>(data_);
 }
 bool VarOrImmediate::is_str() {
   return std::holds_alternative<std::string>(data_);
 }
 
-bool VarOrImmediate::is_int_float() {
-  return std::holds_alternative<int64_t>(data_);
+bool VarOrImmediate::is_imd_float() {
+  return std::holds_alternative<double>(data_);
 }
 
-bool VarOrImmediate::is_int_imd() {
-  return std::holds_alternative<std::string>(data_);
+bool VarOrImmediate::is_imd_int() {
+  return std::holds_alternative<int64_t>(data_);
 }
 
 std::ostream &operator<<(std::ostream &os, const VarOrImmediate &a) {
@@ -199,7 +199,7 @@ void IRGenerator::visit_param_decl(ParamDecl *param_decl) {
   auto n = param_decl;
   int v = current_temp_;
   param_decl->ir_var(v);
-  print_ir_instr(IROp::PARAM, new_temp(), n);
+  print_ir_instr(IROp::PALLOC, new_temp(), n);
 }
 
 void IRGenerator::visit_ref_expr(RefExpr *ref_expr) {
@@ -454,7 +454,7 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
   } break;
 
   case ADD:
-    if (arg1.is_int_imd()) {
+    if (arg1.is_imd_int()) {
       if (arg1.int_imd() == 1) {
         print_ir_instr(IROp::INC, new_temp(), arg2, n);
         break;
@@ -465,7 +465,7 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
         current_var_ = arg2.str();
         break;
       }
-    } else if (arg2.is_int_imd()) {
+    } else if (arg2.is_imd_int()) {
       if (arg2.int_imd() == 1) {
         print_ir_instr(IROp::INC, new_temp(), arg1, n);
         break;
@@ -480,12 +480,12 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
     print_ir_instr(IROp::ADD, new_temp(), arg1, arg2, n);
     break;
   case SUB:
-    if (arg1.is_int_imd()) {
+    if (arg1.is_imd_int()) {
       if (arg1.int_imd() == 0) {
         print_ir_instr(IROp::NEG, new_temp(), arg2, n);
         break;
       }
-    } else if (arg2.is_int_imd()) {
+    } else if (arg2.is_imd_int()) {
       if (arg2.int_imd() == 1) {
         print_ir_instr(IROp::DEC, new_temp(), arg1, n);
         break;
@@ -500,7 +500,7 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
     print_ir_instr(IROp::SUB, new_temp(), arg1, arg2, n);
     break;
   case MUL:
-    if (arg1.is_int_imd()) {
+    if (arg1.is_imd_int()) {
       if (arg1.int_imd() == 1) {
         current_var_ = arg2.str();
         break;
@@ -508,7 +508,7 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
         print_ir_instr(IROp::NEG, new_temp(), arg2, n);
         break;
       }
-    } else if (arg2.is_int_imd()) {
+    } else if (arg2.is_imd_int()) {
       if (arg2.int_imd() == 1) {
         current_var_ = arg1.str();
         break;

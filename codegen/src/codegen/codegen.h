@@ -14,6 +14,7 @@ public:
   virtual void gen_block(IRBlock *block) = 0;
   virtual void gen_instr(IRInstr *instr) = 0;
   virtual void gen_global(IRGlobal *global) = 0;
+  virtual ~CodeGen() = default;
 
 protected:
   void print_instr(auto op);
@@ -25,6 +26,8 @@ protected:
   IRProgram *program_;
   std::ofstream out_file_;
 };
+
+void CodeGen::print_instr(auto op) { out_file_ << to_string(op) << std::endl; }
 
 void CodeGen::print_instr(auto op, auto &&a1) {
   out_file_ << to_string(op) << " " << a1 << std::endl;

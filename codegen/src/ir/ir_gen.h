@@ -19,8 +19,8 @@ public:
   VarOrImmediate(double imd);
 
   bool is_str();
-  bool is_int_float();
-  bool is_int_imd();
+  bool is_imd_float();
+  bool is_imd_int();
 
   VarOrImmediate &operator=(auto &&b) {
     data_ = std::forward<decltype(b)>(b);
@@ -31,7 +31,7 @@ public:
 
   std::string &str();
   int64_t &int_imd();
-  double &double_imd();
+  double &float_imd();
 
 private:
   std::variant<std::string, int64_t, double> data_;

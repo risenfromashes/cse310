@@ -38,6 +38,7 @@ enum class IROp {
   NEQ,
   ALLOC,
   AALLOC,
+  PALLOC,
   GLOBAL,
   GLOBALARR,
   PARAM,
@@ -139,9 +140,11 @@ public:
   int use_count() const { return use_; }
   void add_use() { use_++; }
 
+  int id() { return id_; }
+
 private:
   int id_;
-  int size_;
+  int size_ = 1;
   int use_ = 0;
 
   std::optional<int> offset_;
@@ -150,11 +153,12 @@ private:
 enum class IRArgType { VARIABLE, IMD_INT, IMD_FLOAT, LABEL, GLOBAL };
 
 class IRArg {
+
 public:
   IRArg(IRLabel *label);
   IRArg(IRVar *var);
   IRArg(IRGlobal *global);
-  IRArg(int64_t imd);
+  IRArg(int imd);
   IRArg(double imd);
 
   bool is_label();
@@ -173,11 +177,15 @@ public:
 
   IRArgType type() const { return type_; }
 
+  IRInstr *instr() const { return instr_; }
+  void set_instr(IRInstr *instr) { instr_ = instr; }
+
   friend std::ostream &operator<<(std::ostream &os, IRArg);
 
 private:
-  std::variant<IRLabel *, IRVar *, IRGlobal *, int64_t, double> data_;
+  std::variant<IRLabel *, IRVar *, IRGlobal *, int, double> data_;
   IRArgType type_;
+  IRInstr *instr_ = nullptr;
 };
 
 class IRInstr {
@@ -208,6 +216,8 @@ public:
   IRAddress *dest() { return dest_var_; }
 
   IRBlock *block() { return block_; }
+
+  friend std::ostream &operator<<(std::ostream &os, const IRInstr &instr);
 
 private:
   std::set<IRAddress *> find_srcs();

@@ -78,7 +78,6 @@ private:
                            IRAddress *spill_except, Register *skip = nullptr);
 
   bool call_seq_ = false;
-  std::ofstream out_file_;
   std::vector<std::unique_ptr<Register>> registers_;
   Register *ax, *bx, *cx, *dx;
 

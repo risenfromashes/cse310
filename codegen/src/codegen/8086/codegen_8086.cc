@@ -61,6 +61,7 @@ std::string_view to_string(Op8086 op) {
   case Op8086::CMP:
     return "CMP";
   }
+  return "";
 }
 
 Op8086 negate(Op8086 op) {
@@ -81,7 +82,8 @@ Op8086 negate(Op8086 op) {
     return op;
   }
 }
-Op8086 map_code(IROp op) {
+
+Op8086 map_opcode(IROp op) {
   switch (op) {
   case IROp::ADD:
     return Op8086::ADD;
@@ -274,6 +276,13 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       /* only held by reg now */
       addr->set_dirty(true);
       addr->add_register(reg);
+
+      if (addr->is_var()) {
+        std::cout << "addr: %" << addr->var()->id() << std::endl;
+        for (auto &reg : addr->registers()) {
+          std::cout << "reg: " << reg->name() << std::endl;
+        }
+      }
     }
   } break;
   case IROp::ADD:
@@ -281,7 +290,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
   case IROp::OR:
   case IROp::XOR:
   case IROp::SUB: {
-    auto op = map_code(instr->op());
+    auto op = map_opcode(instr->op());
     auto addr = instr->arg1().addr();
     auto arg1 = instr->arg2();
     auto arg2 = instr->arg3();
@@ -331,14 +340,14 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
 
       addr->set_dirty(true);
       addr->clear_registers();
-      reg->add_address(addr);
+      addr->add_register(reg);
     }
   } break;
   case IROp::INC:
   case IROp::DEC:
   case IROp::NEG:
   case IROp::NOT: {
-    auto op = map_code(instr->op());
+    auto op = map_opcode(instr->op());
     // assume operand is not immediate for now
     auto raddr = instr->arg2().addr();
     auto addr = instr->arg1().addr();
@@ -354,7 +363,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
   } break;
   case IROp::LSHIFT:
   case IROp::RSHIFT: {
-    auto op = map_code(instr->op());
+    auto op = map_opcode(instr->op());
     auto addr = instr->arg1().addr();
     auto larg = instr->arg2();
     auto rarg = instr->arg3();
@@ -498,8 +507,8 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
   case IROp::GEQ:
   case IROp::EQ:
   case IROp::NEQ: {
-    cjmp_op_ = map_code(instr->op());
-    auto op = map_code(instr->op());
+    cjmp_op_ = map_opcode(instr->op());
+    auto op = map_opcode(instr->op());
     auto arg1 = instr->arg2();
     auto arg2 = instr->arg3();
 
@@ -549,6 +558,12 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     }
     {
       auto addr = instr->arg1().addr();
+      if (addr->is_var()) {
+        std::cout << "addr: %" << addr->var()->id() << std::endl;
+        for (auto &reg : addr->registers()) {
+          std::cout << "reg: " << reg->name() << std::endl;
+        }
+      }
       if (addr->is_dirty()) {
         print_instr(Op8086::PUSH, addr->get_register()->name());
       } else {
@@ -562,7 +577,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     spill(ax, instr);
     ax->clear();
 
-    print_instr(Op8086::CALL, instr->arg2().global()->name());
+    print_instr(Op8086::CALL, instr->arg1().global()->name());
     if (instr->has_arg2()) {
       /* there is return value*/
       /* return value by AX for now (for single WORD) */
@@ -596,6 +611,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
   case IROp::LABEL:
   case IROp::ALLOC:
   case IROp::AALLOC:
+  case IROp::PALLOC:
   case IROp::GLOBAL:
   case IROp::GLOBALARR:
     break;
@@ -654,7 +670,7 @@ std::string CodeGen8086::gen_addr(IRAddress *addr) {
 
 std::string CodeGen8086::gen_stack_addr(int off, bool with_si) {
   int offset = effective_offset(off);
-  std::string offstr = (offset > 0 ? '-' : '+') + std::to_string(offset);
+  std::string offstr = (offset > 0 ? "+" : "") + std::to_string(offset);
   if (with_si) {
     return "WORD PTR [BP+SI" + offstr + "]";
   } else {
@@ -789,7 +805,7 @@ void CodeGen8086::gen() {
             << ".STACK 1000H" << std::endl
             << ".DATA" << std::endl;
   for (auto &[_, global] : program_->globals()) {
-    gen_addr(global.get());
+    gen_global(global.get());
   }
   out_file_ << ".CODE" << std::endl;
   for (auto &proc : program_->procs()) {

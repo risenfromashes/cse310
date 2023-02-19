@@ -1,27 +1,31 @@
 %{
-#include <ir_parser.h>
+#include <ir/ir_parser.h>
 
 #include <cstdlib>
 #include <cstdio>
+#include <iostream>
 
 %}
 
-%option reentrant noyywrap nodefault yylineno bison-bridge bison-locations
+%option reentrant noyywrap nodefault yylineno 
 %option extra-type="IRParser *"
 
-ws [ \t\r,]
+ws [ \t\r\n,]
 
 digit [0-9]
 num [-+]?{digit}+
-letter [a-bA-Z]
+letter [a-zA-Z]
 
 alphanum ({letter}|{digit})
 id ((_|{letter})(_|{alphanum})*)
 
+crlf (\r)?\n
+
 %%
 
 {ws}             { }
-";".*"\n"        { yyextra->new_line();                          }
+";".*{crlf}      { yyextra->new_line();                          }
+":".*{crlf}      { yyextra->new_line();                          }
 
 PTRST            { yyextra->add_token(IRToken(IROp::PTRST));     }
 PTRLD            { yyextra->add_token(IRToken(IROp::PTRLD));     }
@@ -61,11 +65,16 @@ RET              { yyextra->add_token(IRToken(IROp::RET));       }
 LABEL            { yyextra->add_token(IRToken(IROp::LABEL));     }
 ADDR             { yyextra->add_token(IRToken(IROp::ADDR));      }
 
-L{num}           { yyextra->add_label(get_label(std::atoi(yytext + 1))); }
-%{num}           { yyextra->add_label(get_var(std::atoi(yytext + 1)));   }
-@{id}            { yyextra->add_token(get_global(yytext + 1));           }
+"L"{num}         { yyextra->add_token(IRArg(yyextra->get_label(std::atoi(yytext + 1)))); }
+"%"{num}         { yyextra->add_token(IRArg(yyextra->get_var(std::atoi(yytext + 1))));   }
+"@"{id}          { yyextra->add_token(IRArg(yyextra->get_global(yytext + 1)));           }
+{num}            { yyextra->add_token(IRArg(std::atoi(yytext)));                         }
 
-.                { assert(false && "Unrecognised char"); }
+.                { 
+                    std::cerr << "Unrecognised char at line: " << yylineno << std::endl
+                              <<  "at: " << yytext << std::endl;
+                    exit(1);
+                 }
 
 %%
 

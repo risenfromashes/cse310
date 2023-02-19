@@ -72,6 +72,8 @@ std::string_view to_string(IROp op) {
     return "ALLOC";
   case AALLOC:
     return "AALLOC";
+  case PALLOC:
+    return "PALLOC";
   case GLOBAL:
     return "GLOBAL";
   case GLOBALARR:
@@ -97,13 +99,13 @@ std::string_view to_string(IROp op) {
 IRArg::IRArg(IRLabel *label) : data_(label) { type_ = IRArgType::LABEL; }
 IRArg::IRArg(IRVar *var) : data_(var) { type_ = IRArgType::VARIABLE; }
 IRArg::IRArg(IRGlobal *global) : data_(global) { type_ = IRArgType::GLOBAL; }
-IRArg::IRArg(int64_t imd) : data_(imd) { type_ = IRArgType::IMD_INT; }
+IRArg::IRArg(int imd) : data_(imd) { type_ = IRArgType::IMD_INT; }
 IRArg::IRArg(double imd) : data_(imd) { type_ = IRArgType::IMD_FLOAT; }
 
 bool IRArg::is_label() { return std::holds_alternative<IRLabel *>(data_); }
 bool IRArg::is_global() { return std::holds_alternative<IRGlobal *>(data_); }
 bool IRArg::is_var() { return std::holds_alternative<IRVar *>(data_); }
-bool IRArg::is_imd_int() { return std::holds_alternative<int64_t>(data_); }
+bool IRArg::is_imd_int() { return std::holds_alternative<int>(data_); }
 bool IRArg::is_imd_float() { return std::holds_alternative<double>(data_); }
 
 IRLabel *IRArg::label() {
@@ -111,19 +113,19 @@ IRLabel *IRArg::label() {
   return std::get<IRLabel *>(data_);
 }
 IRVar *IRArg::var() {
-  assert(is_label());
+  assert(is_var());
   return std::get<IRVar *>(data_);
 }
 IRGlobal *IRArg::global() {
-  assert(is_label());
+  assert(is_global());
   return std::get<IRGlobal *>(data_);
 }
 int64_t IRArg::imd_int() {
-  assert(is_label());
-  return std::get<int64_t>(data_);
+  assert(is_imd_int());
+  return std::get<int>(data_);
 }
 double IRArg::imd_float() {
-  assert(is_label());
+  assert(is_imd_float());
   return std::get<double>(data_);
 }
 
@@ -144,18 +146,24 @@ IRInstr::IRInstr(IROp op) : op_(op) {
 IRInstr::IRInstr(IROp op, IRArg arg1) : op_(op), arg1_(arg1) {
   src_vars_ = find_srcs();
   dest_var_ = find_dest();
+  arg1_->set_instr(this);
 }
 
 IRInstr::IRInstr(IROp op, IRArg arg1, IRArg arg2)
     : op_(op), arg1_(arg1), arg2_(arg2) {
   src_vars_ = find_srcs();
   dest_var_ = find_dest();
+  arg1_->set_instr(this);
+  arg2_->set_instr(this);
 }
 
 IRInstr::IRInstr(IROp op, IRArg arg1, IRArg arg2, IRArg arg3)
     : op_(op), arg1_(arg1), arg2_(arg2), arg3_(arg3) {
   src_vars_ = find_srcs();
   dest_var_ = find_dest();
+  arg1_->set_instr(this);
+  arg2_->set_instr(this);
+  arg3_->set_instr(this);
 }
 
 IRArg IRInstr::arg1() const {
@@ -205,6 +213,7 @@ std::set<IRAddress *> IRInstr::find_srcs() {
     break;
   case IROp::ALLOC:
   case IROp::AALLOC:
+  case IROp::PALLOC:
   case IROp::GLOBAL:
   case IROp::GLOBALARR:
     break;
@@ -265,6 +274,7 @@ IRAddress *IRInstr::find_dest() {
   case IROp::NEQ:
   case IROp::ALLOC:
   case IROp::AALLOC:
+  case IROp::PALLOC:
   case IROp::ADDR:
     return arg1().addr();
   default:
@@ -278,7 +288,7 @@ IRVar *IRAddress::var() {
 }
 
 IRGlobal *IRAddress::global() {
-  assert(is_var());
+  assert(is_global());
   return static_cast<IRGlobal *>(this);
 }
 
@@ -306,6 +316,14 @@ void IRAddress::clear_registers(bool update_reg) {
 }
 
 Register *IRAddress::get_register() {
+  if (registers_.empty()) {
+    std::cerr << "invalid access of ";
+    if (is_global()) {
+      std::cerr << global()->name() << std::endl;
+    } else {
+      std::cerr << "%" << var()->id() << std::endl;
+    }
+  }
   assert(registers_.size());
   return *registers_.begin();
 }
@@ -313,17 +331,34 @@ Register *IRAddress::get_register() {
 std::ostream &operator<<(std::ostream &os, IRArg arg) {
   switch (arg.type()) {
   case IRArgType::VARIABLE:
-    assert(false && "variable cannot be printed directly");
+    os << "%" << arg.var()->id();
     break;
   case IRArgType::IMD_INT:
     os << arg.imd_int();
+    break;
   case IRArgType::IMD_FLOAT:
     os << arg.imd_float();
+    break;
   case IRArgType::LABEL:
     os << arg.label()->name();
+    break;
   case IRArgType::GLOBAL:
     os << arg.global()->name();
     break;
+  }
+  return os;
+}
+
+std::ostream &operator<<(std::ostream &os, const IRInstr &instr) {
+  os << to_string(instr.op());
+  if (instr.arg1_) {
+    os << " " << *instr.arg1_;
+  }
+  if (instr.arg2_) {
+    os << ", " << *instr.arg2_;
+  }
+  if (instr.arg3_) {
+    os << ", " << *instr.arg3_;
   }
   return os;
 }

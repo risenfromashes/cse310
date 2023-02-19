@@ -1,3 +1,4 @@
+
 #include <cstdio>
 #include <cstring>
 #include <fmt/core.h>
@@ -5,10 +6,8 @@
 #include <optional>
 #include <tuple>
 
-#include "codegen/8086/codegen_8086.h"
 #include "codegen/8086/preprocessor.h"
 #include "ir/ir_gen.h"
-#include "ir/ir_parser.h"
 #include "log.h"
 #include "parser_context.h"
 #include "symbol_table.h"
@@ -38,13 +37,6 @@ int main(int argc, char **argv) {
     context.print_pt();
     IRGenerator ir_gen("ir.txt");
     ir_gen.generate(context.ast_root());
-
-    /* parse ir */
-    IRParser ir_parser("ir.txt");
-    ir_parser.parse();
-
-    CodeGen8086 codegen(ir_parser.program(), "code.asm");
-    codegen.gen();
   } else {
     fmt::print(stderr, "Couldn't access input file: {}", in_file);
   }

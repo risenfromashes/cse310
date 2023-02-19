@@ -1,10 +1,13 @@
 #include "ir_block.h"
+#include "ir_proc.h"
 
 #include <algorithm>
 #include <unordered_map>
 
-IRBlock::IRBlock(IRProc *proc) : proc_(proc), label_(nullptr) {}
-IRBlock::IRBlock(IRProc *proc, IRLabel *label) : proc_(proc), label_(label) {
+IRBlock::IRBlock(IRProc *proc, int index)
+    : proc_(proc), idx_(index), label_(nullptr) {}
+IRBlock::IRBlock(IRProc *proc, int index, IRLabel *label)
+    : proc_(proc), idx_(index), label_(label) {
   label_->set_block(this);
 }
 
@@ -89,6 +92,23 @@ IRInstr &IRBlock::last_instr() {
 void IRBlock::alloc_vars() {
   int max_offset = 0;
   for (auto &var : var_in_) {
+    // if (!var->has_address()) {
+    //   std::cout << "undef var: %" << var->id() << std::endl;
+    //   std::cout << "in block #" << index() << std::endl
+    //             << "in proc " << proc()->name() << std::endl;
+    //   for (auto &pre : pred_) {
+    //     std::cout << "pre block #" << pre->index() << std::endl;
+    //   }
+    //   for (auto &suc : succ_) {
+    //     std::cout << "succ block #" << suc->index() << std::endl;
+    //   }
+    //   for (auto &var : ref_) {
+    //     std::cout << "ref var#" << var->id() << std::endl;
+    //   }
+    //   for (auto &var : first_def_) {
+    //     std::cout << "first def var#" << var->id() << std::endl;
+    //   }
+    // }
     assert(var->has_address());
     max_offset = std::max(max_offset, var->offset());
   }
@@ -99,6 +119,8 @@ void IRBlock::alloc_vars() {
     /* params could already have address assigned */
     if (!var->has_address()) {
       vars.push_back(var);
+      // default size
+      var->set_size(1);
     }
   }
 
@@ -111,7 +133,6 @@ void IRBlock::alloc_vars() {
       break;
     case IROp::ALLOC:
       assert(first_def_.contains(instr.arg1().var()));
-      instr.arg1().var()->set_size(1);
     default:
       break;
     }

@@ -6,8 +6,12 @@ IRParser::IRParser(const char *in) {
   assert(in_file_);
   init_scanner();
 }
+IRParser::IRParser(FILE *in) : in_file_(in) { init_scanner(); }
 
-IRParser::~IRParser() { finish_scanner(); }
+IRParser::~IRParser() {
+  finish_scanner();
+  std::fclose(in_file_);
+}
 
 IRLabel *IRParser::get_label(int id) {
   if (!program_.labels_.contains(id)) {
@@ -25,7 +29,7 @@ IRVar *IRParser::get_var(int id) {
 
 IRGlobal *IRParser::get_global(std::string name) {
   if (!program_.globals_.contains(name)) {
-    program_.vars_.emplace(name, std::make_unique<IRGlobal>(name));
+    program_.globals_.emplace(name, std::make_unique<IRGlobal>(name));
   }
   return program_.globals_.at(name).get();
 }
@@ -36,43 +40,42 @@ void IRParser::new_line() {
   }
   if (current_line_[0].is_opcode()) {
     auto opcode = current_line_[0].opcode();
-
     /* global declarations are special cases */
     switch (opcode) {
     case IROp::GLOBAL:
-      return;
+      break;
     case IROp::GLOBALARR: {
       assert(current_line_.size() == 3);
       auto global = current_line_[1].arg().global();
       auto size = current_line_[2].arg().imd_int();
       global->set_size(size);
-      return;
+      break;
     }
     case IROp::PROC: {
       assert(current_line_.size() == 2);
       auto global = current_line_[1].arg().global();
+      std::cout << "new proc: " << global->name() << std::endl;
       new_proc(global);
-      return;
+      break;
     }
     case IROp::ENDP: {
       end_proc();
-      return;
+      break;
     };
     default:
+      /* otherwise just add instruction to current proc */
+      if (current_line_.size() == 1) {
+        add_instr(IRInstr(opcode));
+      } else if (current_line_.size() == 2) {
+        add_instr(IRInstr(opcode, current_line_[1].arg()));
+      } else if (current_line_.size() == 3) {
+        add_instr(
+            IRInstr(opcode, current_line_[1].arg(), current_line_[2].arg()));
+      } else if (current_line_.size() == 4) {
+        add_instr(IRInstr(opcode, current_line_[1].arg(),
+                          current_line_[2].arg(), current_line_[3].arg()));
+      }
       break;
-    }
-
-    /* otherwise just add instruction to current proc */
-    if (current_line_.size() == 1) {
-      add_instr(IRInstr(opcode));
-    } else if (current_line_.size() == 2) {
-      add_instr(IRInstr(opcode, current_line_[1].arg()));
-    } else if (current_line_.size() == 3) {
-      add_instr(
-          IRInstr(opcode, current_line_[1].arg(), current_line_[2].arg()));
-    } else if (current_line_.size() == 4) {
-      add_instr(IRInstr(opcode, current_line_[1].arg(), current_line_[2].arg(),
-                        current_line_[3].arg()));
     }
   } else {
     /* must be a label */

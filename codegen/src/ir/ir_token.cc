@@ -15,7 +15,7 @@ IROp IRToken::opcode() {
 }
 
 IRArg IRToken::arg() {
-  assert(is_opcode());
+  assert(is_arg());
   return std::get<IRArg>(data_);
 }
 

@@ -8,7 +8,7 @@ IRProc::IRProc(std::string name) : name_(std::move(name)) {}
 void IRProc::add_instr(IRInstr instr) {
   assert(!sealed_);
   if (!current_block_) {
-    current_block_ = std::make_unique<IRBlock>(this);
+    current_block_ = std::make_unique<IRBlock>(this, blocks_.size());
   }
 
   /* end block if instr is a jump */
@@ -27,7 +27,7 @@ void IRProc::add_label(IRLabel *label) {
   if (current_block_) {
     add_block();
   }
-  current_block_ = std::make_unique<IRBlock>(this, label);
+  current_block_ = std::make_unique<IRBlock>(this, blocks_.size(), label);
 }
 
 void IRProc::end_proc() {
@@ -56,6 +56,9 @@ void IRProc::find_succ_pre() {
   /* add successors and predecessors */
   for (int i = 0; i < blocks_.size(); i++) {
     auto &block = blocks_[i];
+    if (block->size() == 0) {
+      continue;
+    }
     IRBlock *next_block = nullptr;
     if (i < blocks_.size() - 1) {
       next_block = blocks_[i + 1].get();
@@ -79,8 +82,8 @@ void IRProc::find_succ_pre() {
         succ->add_predecessor(block.get());
         block->add_successor(succ);
       }
+      case IROp::RET:
       default:
-        assert(false);
         break;
       }
     } else {
@@ -184,11 +187,14 @@ void IRProc::find_var_liveness() {
       auto old_in = std::move(block->var_in_);
       block->var_in_.clear();
       /* ref - first_def */
-      std::set_difference(block->ref_.begin(), block->ref_.end(),             //
-                          block->first_def_.begin(), block->first_def_.end(), //
-                          std::inserter(block->var_in_, block->var_in_.end()));
-      /* IN = OUT ∪ (ref - first_def) */
-      block->var_in_.insert(block->var_out_.begin(), block->var_out_.end());
+      std::set_union(block->ref_.begin(), block->ref_.end(),         //
+                     block->var_out_.begin(), block->var_out_.end(), //
+                     std::inserter(block->var_in_, block->var_in_.end()));
+
+      for (auto &var : block->first_def_) {
+        block->var_in_.erase(var);
+      }
+      /* IN = (OUT ∪ ref) - first_def */
 
       if (!change) {
         /* check for change */
@@ -205,12 +211,12 @@ void IRProc::alloc_vars() {
   if (blocks_.size()) {
     auto n = blocks_[0].get();
     /* param definitions should be in first block */
-    int end;
+    int end = 0;
     for (int i = 0; i < n->instrs_.size(); i++) {
       auto &instr = n->instrs_[i];
-      if (instr.op() != IROp::PARAM) {
+      if (instr.op() != IROp::PALLOC) {
         end = i;
-        continue;
+        break;
       }
     }
     // asign offset from the last
@@ -218,6 +224,7 @@ void IRProc::alloc_vars() {
     for (int i = end - 1; i >= 0; i--) {
       auto &instr = n->instrs_[i];
       instr.arg1().var()->set_offset(poff--);
+      instr.arg1().var()->set_dirty(false);
     }
 
     // perform dfs to allocate other variables

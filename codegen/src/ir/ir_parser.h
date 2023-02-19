@@ -11,6 +11,7 @@
 class IRParser {
 public:
   IRParser(const char *file);
+  IRParser(FILE *file);
   ~IRParser();
 
   void init_scanner();
