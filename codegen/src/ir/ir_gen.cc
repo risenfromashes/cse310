@@ -34,6 +34,17 @@ double &VarOrImmediate::double_imd() {
   assert(std::holds_alternative<double>(data_));
   return std::get<double>(data_);
 }
+bool VarOrImmediate::is_str() {
+  return std::holds_alternative<std::string>(data_);
+}
+
+bool VarOrImmediate::is_int_float() {
+  return std::holds_alternative<int64_t>(data_);
+}
+
+bool VarOrImmediate::is_int_imd() {
+  return std::holds_alternative<std::string>(data_);
+}
 
 std::ostream &operator<<(std::ostream &os, const VarOrImmediate &a) {
   if (std::holds_alternative<std::string>(a.data_)) {
@@ -295,17 +306,17 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
     }
     break;
   case PRE_INC:
-    print_ir_instr(IROp::ADD, new_temp(), arg, 1, n);
+    print_ir_instr(IROp::INC, new_temp(), arg, n);
     break;
   case PRE_DEC:
-    print_ir_instr(IROp::SUB, new_temp(), arg, 1, n);
+    print_ir_instr(IROp::DEC, new_temp(), arg, n);
     break;
   case POST_INC:
-    print_ir_instr(IROp::ADD, new_temp(), arg, 1, n);
+    print_ir_instr(IROp::INC, new_temp(), arg, n);
     current_var_ = arg.str();
     break;
   case POST_DEC:
-    print_ir_instr(IROp::SUB, new_temp(), arg, 1, n);
+    print_ir_instr(IROp::DEC, new_temp(), arg, n);
     current_var_ = arg.str();
     break;
   case POINTER_DEREF:
@@ -396,6 +407,10 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
   case ASSIGN: {
     if (auto arr = dynamic_cast<ArraySubscriptExpr *>(l)) {
       auto cnst = arr->subscript()->const_eval();
+      if (!const_eval2) {
+        r->visit(this);
+        arg2 = current_var_;
+      }
       if (cnst) {
         arr->array()->visit(this);
         print_ir_instr(IROp::PTRST, arg2, current_var_, *cnst, n);
@@ -408,6 +423,10 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
       }
     } else if (auto unry = dynamic_cast<UnaryExpr *>(l)) {
       if (unry->op() == UnaryOp::POINTER_DEREF) {
+        if (!const_eval2) {
+          r->visit(this);
+          arg2 = current_var_;
+        }
         unry->operand()->visit(this);
         print_ir_instr(IROp::PTRST, arg2, current_var_, 0, n);
       }
@@ -425,12 +444,69 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
   } break;
 
   case ADD:
+    if (arg1.is_int_imd()) {
+      if (arg1.int_imd() == 1) {
+        print_ir_instr(IROp::INC, new_temp(), arg2, n);
+        break;
+      } else if (arg1.int_imd() == -1) {
+        print_ir_instr(IROp::DEC, new_temp(), arg2, n);
+        break;
+      } else if (arg1.int_imd() == 0) {
+        current_var_ = arg2.str();
+        break;
+      }
+    } else if (arg2.is_int_imd()) {
+      if (arg2.int_imd() == 1) {
+        print_ir_instr(IROp::INC, new_temp(), arg1, n);
+        break;
+      } else if (arg2.int_imd() == -1) {
+        print_ir_instr(IROp::DEC, new_temp(), arg1, n);
+        break;
+      } else if (arg2.int_imd() == 0) {
+        current_var_ = arg1.str();
+        break;
+      }
+    }
     print_ir_instr(IROp::ADD, new_temp(), arg1, arg2, n);
     break;
   case SUB:
+    if (arg1.is_int_imd()) {
+      if (arg1.int_imd() == 0) {
+        print_ir_instr(IROp::NEG, new_temp(), arg2, n);
+        break;
+      }
+    } else if (arg2.is_int_imd()) {
+      if (arg2.int_imd() == 1) {
+        print_ir_instr(IROp::DEC, new_temp(), arg1, n);
+        break;
+      } else if (arg2.int_imd() == -1) {
+        print_ir_instr(IROp::INC, new_temp(), arg1, n);
+        break;
+      } else if (arg2.int_imd() == 0) {
+        current_var_ = arg1.str();
+        break;
+      }
+    }
     print_ir_instr(IROp::SUB, new_temp(), arg1, arg2, n);
     break;
   case MUL:
+    if (arg1.is_int_imd()) {
+      if (arg1.int_imd() == 1) {
+        current_var_ = arg2.str();
+        break;
+      } else if (arg1.int_imd() == -1) {
+        print_ir_instr(IROp::NEG, new_temp(), arg2, n);
+        break;
+      }
+    } else if (arg2.is_int_imd()) {
+      if (arg2.int_imd() == 1) {
+        current_var_ = arg1.str();
+        break;
+      } else if (arg2.int_imd() == -1) {
+        print_ir_instr(IROp::NEG, new_temp(), arg1, n);
+        break;
+      }
+    }
     print_ir_instr(IROp::MUL, new_temp(), arg1, arg2, n);
     break;
   case DIV:

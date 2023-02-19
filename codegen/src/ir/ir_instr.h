@@ -14,6 +14,9 @@ enum class IROp {
   PTRLD,
   COPY,
   ADD,
+  INC,
+  DEC,
+  NEG,
   AND,
   OR,
   XOR,
@@ -85,19 +88,20 @@ public:
   void set_dirty(bool dirty) { dirty_ = dirty; }
   bool is_dirty() { return dirty_; }
 
-  void add_register(Register *reg);
-  void remove_register(Register *reg);
-  void clear_registers();
+  void add_register(Register *reg, bool update_reg = true);
+  void remove_register(Register *reg, bool update_reg = true);
+  void clear_registers(bool update_reg = true);
   Register *get_register();
 
-  bool holds(Register *reg) { return registers_.contains(reg); }
+  bool held_at(Register *reg) { return registers_.contains(reg); }
   int reg_count() { return registers_.size(); }
   const std::set<Register *> &registers() { return registers_; }
 
 protected:
   IRAddressType type_;
   bool dirty_;
-
+  bool is_const_;
+  int cnst_;
   std::set<Register *> registers_;
 };
 
@@ -168,6 +172,8 @@ public:
   double imd_float();
 
   IRArgType type() const { return type_; }
+
+  friend std::ostream &operator<<(std::ostream &os, IRArg);
 
 private:
   std::variant<IRLabel *, IRVar *, IRGlobal *, int64_t, double> data_;

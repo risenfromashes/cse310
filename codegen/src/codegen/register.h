@@ -12,7 +12,6 @@ class Register {
 public:
   Register(std::string name);
 
-  void clear();
   int spill_cost(IRInstr *instr, IRAddress *except = nullptr);
 
   std::string_view name() { return name_; }
@@ -22,9 +21,9 @@ public:
   static Register *min_cost(const std::vector<std::unique_ptr<Register>> &list,
                             IRInstr *instr, IRAddress *except = nullptr);
 
-  void add_address(IRAddress *addr) { addresses_.insert(addr); }
-
-  void remove_address(IRAddress *addr) { addresses_.erase(addr); }
+  void add_address(IRAddress *addr, bool update_addr = true);
+  void remove_address(IRAddress *addr, bool update_addr = true);
+  void clear(bool update_addr = true);
 
   size_t addr_count() { return addresses_.size(); }
 

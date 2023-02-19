@@ -4,14 +4,12 @@
 
 Register::Register(std::string name) : name_(std::move(name)) {}
 
-void Register::clear() { addresses_.clear(); }
-
 int Register::spill_cost(IRInstr *instr, IRAddress *except) {
   int cost = 0;
   auto &srcs = instr->srcs();
   auto dest = instr->dest();
   for (auto addr : addresses_) {
-    assert(addr->holds(this));
+    assert(addr->held_at(this));
     /*
      * Zero Cost Cases
      */
@@ -70,4 +68,26 @@ Register *Register::min_cost(const std::vector<std::unique_ptr<Register>> &list,
     }
   }
   return min;
+}
+
+void Register::add_address(IRAddress *addr, bool update_addr) {
+  if (update_addr) {
+    addr->add_register(this, false);
+  }
+  addresses_.insert(addr);
+}
+void Register::remove_address(IRAddress *addr, bool update_addr) {
+  if (update_addr) {
+    addr->remove_register(this, false);
+  }
+  addresses_.erase(addr);
+}
+
+void Register::clear(bool update_addr) {
+  if (update_addr) {
+    for (auto addr : addresses_) {
+      addr->remove_register(this, false);
+    }
+  }
+  addresses_.clear();
 }

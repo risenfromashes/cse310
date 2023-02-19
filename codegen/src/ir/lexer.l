@@ -30,6 +30,9 @@ ADD              { yyextra->add_token(IRToken(IROp::ADD));       }
 AND              { yyextra->add_token(IRToken(IROp::AND));       }
 OR               { yyextra->add_token(IRToken(IROp::OR));        }
 XOR              { yyextra->add_token(IRToken(IROp::XOR));       }
+INC              { yyextra->add_token(IRToken(IROp::INC));       }
+DEC              { yyextra->add_token(IRToken(IROp::DEC));       }
+NEG              { yyextra->add_token(IRToken(IROp::NEG));       }
 NOT              { yyextra->add_token(IRToken(IROp::NOT));       }
 SUB              { yyextra->add_token(IRToken(IROp::SUB));       }
 MUL              { yyextra->add_token(IRToken(IROp::MUL));       }

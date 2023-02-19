@@ -18,6 +18,10 @@ public:
   VarOrImmediate(int64_t imd);
   VarOrImmediate(double imd);
 
+  bool is_str();
+  bool is_int_float();
+  bool is_int_imd();
+
   VarOrImmediate &operator=(auto &&b) {
     data_ = std::forward<decltype(b)>(b);
     return *this;

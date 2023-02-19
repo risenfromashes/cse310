@@ -1,4 +1,5 @@
 #include "ir_instr.h"
+#include "codegen/register.h"
 
 bool is_jump(IROp op) {
   switch (op) {
@@ -23,6 +24,12 @@ std::string_view to_string(IROp op) {
     return "COPY";
   case ADD:
     return "ADD";
+  case INC:
+    return "INC";
+  case DEC:
+    return "DEC";
+  case NEG:
+    return "NEG";
   case AND:
     return "AND";
   case OR:
@@ -182,7 +189,10 @@ std::set<IRAddress *> IRInstr::find_srcs() {
   case IROp::COPY:
     src.push_back(arg2());
     break;
+  case IROp::INC:
+  case IROp::DEC:
   case IROp::NOT:
+  case IROp::NEG:
     src.push_back(arg2());
     break;
   case IROp::JMPIF:
@@ -238,6 +248,9 @@ IRAddress *IRInstr::find_dest() {
   case IROp::OR:
   case IROp::XOR:
   case IROp::NOT:
+  case IROp::INC:
+  case IROp::DEC:
+  case IROp::NEG:
   case IROp::SUB:
   case IROp::MUL:
   case IROp::DIV:
@@ -269,10 +282,48 @@ IRGlobal *IRAddress::global() {
   return static_cast<IRGlobal *>(this);
 }
 
-void IRAddress::add_register(Register *reg) { registers_.insert(reg); }
-void IRAddress::remove_register(Register *reg) { registers_.erase(reg); }
-void IRAddress::clear_registers() { registers_.clear(); }
+void IRAddress::add_register(Register *reg, bool update_reg) {
+  if (update_reg) {
+    reg->add_address(this, false);
+  }
+  registers_.insert(reg);
+}
+
+void IRAddress::remove_register(Register *reg, bool update_reg) {
+  if (update_reg) {
+    reg->remove_address(this, false);
+  }
+  registers_.erase(reg);
+}
+
+void IRAddress::clear_registers(bool update_reg) {
+  if (update_reg) {
+    for (auto reg : registers_) {
+      reg->remove_address(this, false);
+    }
+  }
+  registers_.clear();
+}
+
 Register *IRAddress::get_register() {
   assert(registers_.size());
   return *registers_.begin();
+}
+
+std::ostream &operator<<(std::ostream &os, IRArg arg) {
+  switch (arg.type()) {
+  case IRArgType::VARIABLE:
+    assert(false && "variable cannot be printed directly");
+    break;
+  case IRArgType::IMD_INT:
+    os << arg.imd_int();
+  case IRArgType::IMD_FLOAT:
+    os << arg.imd_float();
+  case IRArgType::LABEL:
+    os << arg.label()->name();
+  case IRArgType::GLOBAL:
+    os << arg.global()->name();
+    break;
+  }
+  return os;
 }
