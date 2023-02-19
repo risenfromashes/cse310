@@ -164,6 +164,7 @@ CodeGen8086::CodeGen8086(IRProgram *program, const char *out)
   bx = registers_[(int)BX].get();
   cx = registers_[(int)CX].get();
   dx = registers_[(int)DX].get();
+  stack_start_ = 2 * 3; // backing up 3 regisers
 }
 
 void CodeGen8086::gen_instr(IRInstr *instr) {
@@ -586,7 +587,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       }
     }
     spill_all(instr);
-    proc_ret();
+    proc_ret(instr->block()->proc());
   } break;
   /* no assembly generated for following opcodes
      on instruction level */
@@ -625,18 +626,20 @@ void CodeGen8086::gen_block(IRBlock *block) {
 
 void CodeGen8086::gen_proc(IRProc *proc) {
   out_file_ << proc->name() << " PROC" << std::endl;
-  print_instr(Op8086::PUSH, "BP");
-  print_instr(Op8086::PUSH, "BX");
-  print_instr(Op8086::PUSH, "CX");
-  print_instr(Op8086::PUSH, "DX");
-  print_instr(Op8086::MOV, "BP", "SP");
+  if (proc->name() == "main") {
+    print_instr(Op8086::MOV, "AX", "@DATA");
+    print_instr(Op8086::MOV, "DS", "AX");
+  } else {
+    print_instr(Op8086::PUSH, "BP");
+    print_instr(Op8086::PUSH, "BX");
+    print_instr(Op8086::PUSH, "CX");
+    print_instr(Op8086::PUSH, "DX");
+    print_instr(Op8086::MOV, "BP", "SP");
+  }
   for (auto &block : proc->blocks()) {
     gen_block(block.get());
   }
-  if (proc->name() == "main") {
-    print_instr(Op8086::MOV, "AH", "4CH");
-    print_instr(Op8086::INT, "21H");
-  }
+
   out_file_ << proc->name() << " ENDP" << std::endl;
 }
 
@@ -693,7 +696,7 @@ int CodeGen8086::effective_offset(int offset) {
   if (offset > 0) {
     return -2 * offset;
   } else {
-    return 2 * offset;
+    return -2 * offset + stack_start_ + 2;
   }
 }
 
@@ -708,12 +711,18 @@ Register *CodeGen8086::spill_and_load(IRAddress *addr, IRInstr *instr,
   return reg;
 }
 
-void CodeGen8086::proc_ret() {
-  print_instr(Op8086::POP, "DX");
-  print_instr(Op8086::POP, "CX");
-  print_instr(Op8086::POP, "BX");
-  print_instr(Op8086::POP, "BP");
-  print_instr(Op8086::RET);
+void CodeGen8086::proc_ret(IRProc *proc) {
+  if (proc->name() != "main") {
+    print_instr(Op8086::MOV, "SP", "BP");
+    print_instr(Op8086::POP, "DX");
+    print_instr(Op8086::POP, "CX");
+    print_instr(Op8086::POP, "BX");
+    print_instr(Op8086::POP, "BP");
+    print_instr(Op8086::RET);
+  } else {
+    print_instr(Op8086::MOV, "AH", "4CH");
+    print_instr(Op8086::INT, "21H");
+  }
 }
 
 void CodeGen8086::spill_all(IRInstr *instr) {
@@ -722,6 +731,58 @@ void CodeGen8086::spill_all(IRInstr *instr) {
     reg->clear();
   }
 }
+
+void CodeGen8086::gen_global(IRGlobal *global) {
+  out_file_ << global->name() << " DW " << global->size() << " DUP (0000H)"
+            << std::endl;
+}
+
+constexpr const char *built_in = R"(
+println PROC             
+    PUSH BP
+    PUSH BX
+    PUSH CX            
+    PUSH DX 
+    MOV  BP, SP   
+    XOR CX, CX           
+    MOV BX, 10
+    PUSH BX
+    MOV AX, WORD PTR [BP+10]  
+    CMP AX, 0
+    JGE REPEAT_PRINT_STACK    
+    MOV BX, 1 ; save sign
+    NEG AX
+REPEAT_PRINT_STACK: 
+    XOR DX, DX
+    DIV WORD PTR [BP-2]
+    PUSH DX
+    INC CX
+    CMP AX, 0
+    JE  EXIT_PRINT_STACK
+    JMP REPEAT_PRINT_STACK         
+EXIT_PRINT_STACK:      
+    MOV AH, 2            
+    TEST BX, 1
+    JZ LOOP_PRINT        
+    MOV DL, '-'
+    INT 21H              
+LOOP_PRINT:        
+    POP DX
+    ADD DL, '0'
+    INT 21H  
+    LOOP LOOP_PRINT
+    MOV DL, 0DH ; print new line
+	INT 21H
+	MOV DL, 0AH
+	INT 21H      
+	MOV SP, BP
+    POP DX                             
+    POP CX
+    POP BX
+    POP BP
+    RET
+println ENDP
+)";
 
 void CodeGen8086::gen() {
   out_file_ << ".MODEL SMALL" << std::endl
@@ -734,10 +795,6 @@ void CodeGen8086::gen() {
   for (auto &proc : program_->procs()) {
     gen_proc(proc.get());
   }
+  out_file_ << built_in << std::endl;
   out_file_ << "END main" << std::endl;
-}
-
-void CodeGen8086::gen_global(IRGlobal *global) {
-  out_file_ << global->name() << " DW " << global->size() << " DUP (0000H)"
-            << std::endl;
 }

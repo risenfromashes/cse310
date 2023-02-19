@@ -184,6 +184,13 @@ void IRGenerator::visit_func_decl(FuncDecl *func_decl) {
       param->visit(this);
     }
     func_decl->definition()->visit(this);
+    auto &last = func_decl->definition()->stmts().back();
+
+    if (func_decl->func_type()->return_type()->is_void() &&
+        !dynamic_cast<ReturnStmt *>(last.get())) {
+      // implicit return
+      print_ir_instr(IROp::RET, n);
+    }
     print_ir_instr(IROp::ENDP, name, n);
   }
 }

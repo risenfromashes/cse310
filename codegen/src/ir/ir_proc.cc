@@ -205,15 +205,22 @@ void IRProc::alloc_vars() {
   if (blocks_.size()) {
     auto n = blocks_[0].get();
     /* param definitions should be in first block */
-    int poff = -1;
+    int end;
     for (int i = 0; i < n->instrs_.size(); i++) {
-      auto &instr = n->instrs_[0];
+      auto &instr = n->instrs_[i];
       if (instr.op() != IROp::PARAM) {
-        break;
+        end = i;
+        continue;
       }
+    }
+    // asign offset from the last
+    int poff = -1;
+    for (int i = end - 1; i >= 0; i--) {
+      auto &instr = n->instrs_[i];
       instr.arg1().var()->set_offset(poff--);
     }
 
+    // perform dfs to allocate other variables
     std::stack<IRBlock *> stack;
     stack.push(n);
     std::set<IRBlock *> visited;

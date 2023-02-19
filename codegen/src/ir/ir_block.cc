@@ -3,8 +3,8 @@
 #include <algorithm>
 #include <unordered_map>
 
-IRBlock::IRBlock(IRProc *proc) : label_(nullptr) {}
-IRBlock::IRBlock(IRProc *proc, IRLabel *label) : label_(label) {
+IRBlock::IRBlock(IRProc *proc) : proc_(proc), label_(nullptr) {}
+IRBlock::IRBlock(IRProc *proc, IRLabel *label) : proc_(proc), label_(label) {
   label_->set_block(this);
 }
 

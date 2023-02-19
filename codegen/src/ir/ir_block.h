@@ -37,6 +37,8 @@ public:
 
   int stack_offset() { return stack_offset_; }
 
+  IRProc *proc() { return proc_; }
+
 private:
   IRLabel *label_;
   /* successors and predecessors in flow graph */
@@ -55,4 +57,6 @@ private:
   bool sealed_ = false;
 
   int stack_offset_;
+
+  IRProc *proc_;
 };

@@ -54,6 +54,9 @@ public:
   void gen_instr(IRInstr *instr) override;
   void gen_global(IRGlobal *global) override;
 
+  // function return sequence
+  void proc_ret(IRProc *proc);
+
   std::string gen_addr(IRAddress *addr);
   std::string gen_stack_addr(int offset, bool with_si = false);
 
@@ -73,8 +76,6 @@ private:
   // loads addr into register (doesn't clear reg)
   Register *spill_and_load(IRAddress *addr, IRInstr *instr,
                            IRAddress *spill_except, Register *skip = nullptr);
-  // function return sequence
-  void proc_ret();
 
   bool call_seq_ = false;
   std::ofstream out_file_;
@@ -82,4 +83,6 @@ private:
   Register *ax, *bx, *cx, *dx;
 
   Op8086 cjmp_op_;
+
+  int stack_start_;
 };
