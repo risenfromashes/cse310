@@ -4,12 +4,14 @@
 
 #include <set>
 
+class IRProc;
+
 class IRBlock {
   friend class IRProc;
 
 public:
-  IRBlock();
-  IRBlock(IRLabel *);
+  IRBlock(IRProc *proc);
+  IRBlock(IRProc *proc, IRLabel *);
 
   void add_successor(IRBlock *block);
   void add_predecessor(IRBlock *block);
@@ -33,6 +35,8 @@ public:
   const std::vector<IRInstr> &instrs();
   IRInstr &last_instr();
 
+  int stack_offset() { return stack_offset_; }
+
 private:
   IRLabel *label_;
   /* successors and predecessors in flow graph */
@@ -49,4 +53,6 @@ private:
 
   std::vector<IRInstr> instrs_;
   bool sealed_ = false;
+
+  int stack_offset_;
 };

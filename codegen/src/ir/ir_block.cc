@@ -3,8 +3,10 @@
 #include <algorithm>
 #include <unordered_map>
 
-IRBlock::IRBlock() : label_(nullptr) {}
-IRBlock::IRBlock(IRLabel *label) : label_(label) { label_->set_block(this); }
+IRBlock::IRBlock(IRProc *proc) : label_(nullptr) {}
+IRBlock::IRBlock(IRProc *proc, IRLabel *label) : label_(label) {
+  label_->set_block(this);
+}
 
 void IRBlock::add_successor(IRBlock *block) { succ_.push_back(block); }
 
@@ -13,6 +15,7 @@ void IRBlock::add_predecessor(IRBlock *block) { pred_.push_back(block); }
 void IRBlock::add_instr(IRInstr instr) {
   assert(!sealed_);
   instrs_.push_back(std::move(instr));
+  instrs_.back().set_block(this);
 }
 
 void IRBlock::process() {
@@ -99,12 +102,30 @@ void IRBlock::alloc_vars() {
     }
   }
 
+  for (auto &instr : instrs_) {
+    /* set variable sizes */
+    switch (instr.op()) {
+    case IROp::AALLOC:
+      assert(first_def_.contains(instr.arg1().var()));
+      instr.arg1().var()->set_size(instr.arg2().imd_int());
+      break;
+    case IROp::ALLOC:
+      assert(first_def_.contains(instr.arg1().var()));
+      instr.arg1().var()->set_size(1);
+    default:
+      break;
+    }
+  }
+
   /* allocate more used vars lower on the stack */
   std::sort(vars.begin(), vars.end(), [](const IRVar *a, const IRVar *b) {
     return a->use_count() > b->use_count();
   });
 
   for (auto &var : vars) {
-    var->set_offset(max_offset += var->size());
+    max_offset += var->size();
+    var->set_offset(max_offset);
   }
+
+  stack_offset_ = max_offset;
 }

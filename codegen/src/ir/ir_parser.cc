@@ -2,24 +2,24 @@
 #include "ir/ir_proc.h"
 
 IRLabel *IRParser::get_label(int id) {
-  if (!labels_.contains(id)) {
-    labels_.emplace(id, std::make_unique<IRLabel>(id));
+  if (!program_.labels_.contains(id)) {
+    program_.labels_.emplace(id, std::make_unique<IRLabel>(id));
   }
-  return labels_.at(id).get();
+  return program_.labels_.at(id).get();
 }
 
 IRVar *IRParser::get_var(int id) {
-  if (!vars_.contains(id)) {
-    vars_.emplace(id, std::make_unique<IRVar>(id));
+  if (!program_.vars_.contains(id)) {
+    program_.vars_.emplace(id, std::make_unique<IRVar>(id));
   }
-  return vars_.at(id).get();
+  return program_.vars_.at(id).get();
 }
 
 IRGlobal *IRParser::get_global(std::string name) {
-  if (!globals_.contains(name)) {
-    vars_.emplace(name, std::make_unique<IRGlobal>(name));
+  if (!program_.globals_.contains(name)) {
+    program_.vars_.emplace(name, std::make_unique<IRGlobal>(name));
   }
-  return globals_.at(name).get();
+  return program_.globals_.at(name).get();
 }
 
 void IRParser::new_line() {
@@ -79,6 +79,7 @@ void IRParser::new_proc(IRGlobal *global) {
 void IRParser::end_proc() {
   assert(current_proc_);
   current_proc_->end_proc();
+  program_.procs_.push_back(std::move(current_proc_));
   current_proc_ = nullptr;
 }
 

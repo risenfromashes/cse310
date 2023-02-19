@@ -58,6 +58,8 @@ public:
   void set_block(IRBlock *block) { block_ = block; }
   IRBlock *block() { return block_; }
 
+  std::string name() { return "L" + std::to_string(id_); }
+
 private:
   int id_;
   IRBlock *block_;
@@ -83,11 +85,14 @@ public:
   void set_dirty(bool dirty) { dirty_ = dirty; }
   bool is_dirty() { return dirty_; }
 
-  void add_register(Register *reg) { registers_.insert(reg); }
-  void remove_register(Register *reg) { registers_.erase(reg); }
-  void clear_registers() { registers_.clear(); }
+  void add_register(Register *reg);
+  void remove_register(Register *reg);
+  void clear_registers();
+  Register *get_register();
+
   bool holds(Register *reg) { return registers_.contains(reg); }
   int reg_count() { return registers_.size(); }
+  const std::set<Register *> &registers() { return registers_; }
 
 protected:
   IRAddressType type_;
@@ -170,6 +175,8 @@ private:
 };
 
 class IRInstr {
+  friend class IRBlock;
+
 public:
   typedef std::set<IRAddress *> NextUseInfo;
   IRInstr(IROp op);
@@ -194,9 +201,13 @@ public:
   const std::set<IRAddress *> &srcs() { return src_vars_; }
   IRAddress *dest() { return dest_var_; }
 
+  IRBlock *block() { return block_; }
+
 private:
   std::set<IRAddress *> find_srcs();
   IRAddress *find_dest();
+
+  void set_block(IRBlock *block) { block_ = block; }
 
   IROp op_;
   std::optional<IRArg> arg1_;
@@ -207,4 +218,6 @@ private:
 
   std::set<IRAddress *> src_vars_;
   IRAddress *dest_var_;
+
+  IRBlock *block_;
 };

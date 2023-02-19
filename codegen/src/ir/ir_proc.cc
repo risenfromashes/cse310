@@ -201,3 +201,39 @@ void IRProc::find_var_liveness() {
     }
   }
 }
+
+void IRProc::alloc_vars() {
+  /* now perform dfs to allocate variables in correct order */
+  if (blocks_.size()) {
+    auto n = blocks_[0].get();
+    /* param definitions should be in first block */
+    int poff = -1;
+    for (int i = 0; i < n->instrs_.size(); i++) {
+      auto &instr = n->instrs_[0];
+      if (instr.op() != IROp::PARAM) {
+        break;
+      }
+      instr.arg1().var()->set_offset(poff--);
+    }
+
+    std::stack<IRBlock *> stack;
+    stack.push(n);
+    std::set<IRBlock *> visited;
+
+    while (!stack.empty()) {
+      auto c = stack.top();
+      stack.pop();
+
+      if (visited.contains(c)) {
+        continue;
+      }
+
+      visited.insert(c);
+      c->alloc_vars();
+
+      for (auto &succ : c->succ_) {
+        stack.push(succ);
+      }
+    }
+  }
+}

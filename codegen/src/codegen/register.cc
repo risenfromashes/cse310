@@ -6,13 +6,7 @@ Register::Register(std::string name) : name_(std::move(name)) {}
 
 void Register::clear() { addresses_.clear(); }
 
-void Register::spill() {
-  for (auto &address : addresses_) {
-    store(address);
-  }
-}
-
-int Register::spill_cost(IRInstr *instr) {
+int Register::spill_cost(IRInstr *instr, IRAddress *except) {
   int cost = 0;
   auto &srcs = instr->srcs();
   auto dest = instr->dest();
@@ -21,6 +15,10 @@ int Register::spill_cost(IRInstr *instr) {
     /*
      * Zero Cost Cases
      */
+    /* ignore this address */
+    if (addr == except) {
+      continue;
+    }
     /* value is up to date in memory */
     if (!addr->is_dirty()) {
       continue;
@@ -42,4 +40,34 @@ int Register::spill_cost(IRInstr *instr) {
     cost++;
   }
   return cost;
+}
+
+Register *Register::min_cost(std::initializer_list<Register *> list,
+                             IRInstr *instr, IRAddress *except) {
+  assert(list.size());
+  int min_cost = 1e9;
+  Register *min = nullptr;
+  for (auto *reg : list) {
+    int cost = reg->spill_cost(instr, except);
+    if (cost < min_cost) {
+      min_cost = cost;
+      min = reg;
+    }
+  }
+  return min;
+}
+
+Register *Register::min_cost(const std::vector<std::unique_ptr<Register>> &list,
+                             IRInstr *instr, IRAddress *except) {
+  assert(list.size());
+  int min_cost = 1e9;
+  Register *min = nullptr;
+  for (auto &reg : list) {
+    int cost = reg->spill_cost(instr, except);
+    if (cost < min_cost) {
+      min_cost = cost;
+      min = reg.get();
+    }
+  }
+  return min;
 }

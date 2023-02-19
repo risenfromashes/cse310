@@ -268,3 +268,11 @@ IRGlobal *IRAddress::global() {
   assert(is_var());
   return static_cast<IRGlobal *>(this);
 }
+
+void IRAddress::add_register(Register *reg) { registers_.insert(reg); }
+void IRAddress::remove_register(Register *reg) { registers_.erase(reg); }
+void IRAddress::clear_registers() { registers_.clear(); }
+Register *IRAddress::get_register() {
+  assert(registers_.size());
+  return *registers_.begin();
+}

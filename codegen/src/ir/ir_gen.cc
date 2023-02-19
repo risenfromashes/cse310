@@ -157,7 +157,7 @@ void IRGenerator::visit_return_stmt(ReturnStmt *return_stmt) {
     return_stmt->expr()->visit(this);
     print_ir_instr(IROp::RET, current_var_, n);
   } else {
-    print_ir_instr(IROp::RET, "void", n);
+    print_ir_instr(IROp::RET, n);
   }
 }
 
@@ -205,7 +205,11 @@ void IRGenerator::visit_call_expr(CallExpr *call_expr) {
   }
   jump_ = false;
   call_expr->callee()->visit(this);
-  print_ir_instr(IROp::CALL, current_var_, n);
+  if (call_expr->func_type()->return_type()->is_void()) {
+    print_ir_instr(IROp::CALL, current_var_, n);
+  } else {
+    print_ir_instr(IROp::CALL, current_var_, new_temp(), n);
+  }
 }
 
 void IRGenerator::visit_var_decl(VarDecl *var_decl) {
@@ -620,4 +624,33 @@ void IRGenerator::visit_char_literal(CharLiteral *char_literal) {
 void IRGenerator::visit_float_literal(FloatLiteral *float_literal) {
   auto n = float_literal;
   print_ir_instr(IROp::COPY, new_temp(), float_literal->value(), n);
+}
+
+void IRGenerator::print_ir_label(std::string &label) {
+  out_file_ << label << ": " << std::endl;
+}
+
+std::string IRGenerator::new_label() {
+  int cl = current_label_++;
+  return "L" + std::to_string(cl);
+}
+
+void IRGenerator::print_tab(IROp op) {
+  switch (op) {
+  case IROp::PROC:
+  case IROp::GLOBAL:
+    break;
+  default:
+    out_file_ << "\t";
+  }
+}
+
+void IRGenerator::print_src_loc(ASTNode *node) {
+  out_file_ << "\t\t; line #" << node->location().start_line() << std::endl;
+}
+
+void IRGenerator::print_ir_instr(IROp op, ASTNode *n) {
+  print_tab(op);
+  out_file_ << to_string(op);
+  print_src_loc(n);
 }

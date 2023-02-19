@@ -76,46 +76,16 @@ public:
 
 private:
   IRGenContext &context() { return context_stack_.top(); }
-  void print_tab(IROp op) {
-    switch (op) {
-    case IROp::PROC:
-    case IROp::GLOBAL:
-      break;
-    default:
-      out_file_ << "\t";
-    }
-  }
 
-  void print_src_loc(ASTNode *node) {
-    out_file_ << "\t\t; line #" << node->location().start_line() << std::endl;
-  }
+  void print_tab(IROp op);
+  void print_src_loc(ASTNode *node);
+  void print_ir_instr(IROp op, ASTNode *n);
+  void print_ir_instr(IROp op, auto &&a1, ASTNode *n);
+  void print_ir_instr(IROp op, auto &&a1, auto &&a2, ASTNode *n);
+  void print_ir_instr(IROp op, auto &&a1, auto &&a2, auto &&a3, ASTNode *n);
+  void print_ir_label(std::string &label);
 
-  void print_ir_instr(IROp op, auto &&a1, ASTNode *n) {
-    print_tab(op);
-    out_file_ << to_string(op) << " " << a1;
-    print_src_loc(n);
-  }
-
-  void print_ir_instr(IROp op, auto &&a1, auto &&a2, ASTNode *n) {
-    print_tab(op);
-    out_file_ << to_string(op) << " " << a1 << ", " << a2;
-    print_src_loc(n);
-  }
-
-  void print_ir_instr(IROp op, auto &&a1, auto &&a2, auto &&a3, ASTNode *n) {
-    print_tab(op);
-    out_file_ << to_string(op) << " " << a1 << ", " << a2 << ", " << a3;
-    print_src_loc(n);
-  }
-
-  void print_ir_label(std::string &label) {
-    out_file_ << label << ": " << std::endl;
-  }
-
-  std::string new_label() {
-    int cl = current_label_++;
-    return "L" + std::to_string(cl);
-  }
+  std::string new_label();
 
   void gen_conditional_jump(ASTNode *n);
   void gen_expr_jump(ASTNode *n);
@@ -135,3 +105,22 @@ private:
 
   std::stack<IRGenContext> context_stack_;
 };
+
+void IRGenerator::print_ir_instr(IROp op, auto &&a1, ASTNode *n) {
+  print_tab(op);
+  out_file_ << to_string(op) << " " << a1;
+  print_src_loc(n);
+}
+
+void IRGenerator::print_ir_instr(IROp op, auto &&a1, auto &&a2, ASTNode *n) {
+  print_tab(op);
+  out_file_ << to_string(op) << " " << a1 << ", " << a2;
+  print_src_loc(n);
+}
+
+void IRGenerator::print_ir_instr(IROp op, auto &&a1, auto &&a2, auto &&a3,
+                                 ASTNode *n) {
+  print_tab(op);
+  out_file_ << to_string(op) << " " << a1 << ", " << a2 << ", " << a3;
+  print_src_loc(n);
+}
