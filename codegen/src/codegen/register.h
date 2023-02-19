@@ -12,14 +12,19 @@ class Register {
 public:
   Register(std::string name);
 
-  int spill_cost(IRInstr *instr, IRAddress *except = nullptr);
+  int spill_cost(IRInstr *instr, IRAddress *except = nullptr,
+                 IRAddress *keep = nullptr);
 
   std::string_view name() { return name_; }
 
-  static Register *min_cost(std::initializer_list<Register *> list,
-                            IRInstr *instr, IRAddress *except = nullptr);
-  static Register *min_cost(const std::vector<std::unique_ptr<Register>> &list,
-                            IRInstr *instr, IRAddress *except = nullptr);
+  static Register *min_spill_reg(std::initializer_list<Register *> list,
+                                 IRInstr *instr, Register *skip = nullptr,
+                                 IRAddress *except = nullptr,
+                                 IRAddress *keep = nullptr);
+  static Register *
+  min_spill_reg(const std::vector<std::unique_ptr<Register>> &list,
+                IRInstr *instr, Register *skip = nullptr,
+                IRAddress *except = nullptr, IRAddress *keep = nullptr);
 
   void add_address(IRAddress *addr, bool update_addr = true);
   void remove_address(IRAddress *addr, bool update_addr = true);

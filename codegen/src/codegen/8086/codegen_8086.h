@@ -16,6 +16,7 @@ enum class Op8086 {
   INC,
   DEC,
   NOT,
+  CMP,
   IMUL,
   IDIV,
   SAL,
@@ -64,8 +65,8 @@ public:
 
 private:
   // loads addr into register (doesn't clear reg)
-  Register *load_addr_into_reg(IRAddress *addr, IRInstr *instr,
-                               IRAddress *spill_except);
+  Register *spill_and_load(IRAddress *addr, IRInstr *instr,
+                           IRAddress *spill_except, Register *skip = nullptr);
 
   bool call_seq_ = false;
   std::ofstream out_file_;

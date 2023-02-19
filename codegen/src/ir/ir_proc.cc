@@ -8,7 +8,7 @@ IRProc::IRProc(std::string name) : name_(std::move(name)) {}
 void IRProc::add_instr(IRInstr instr) {
   assert(!sealed_);
   if (!current_block_) {
-    current_block_ = std::make_unique<IRBlock>();
+    current_block_ = std::make_unique<IRBlock>(this);
   }
 
   /* end block if instr is a jump */
@@ -27,7 +27,7 @@ void IRProc::add_label(IRLabel *label) {
   if (current_block_) {
     add_block();
   }
-  current_block_ = std::make_unique<IRBlock>(label);
+  current_block_ = std::make_unique<IRBlock>(this, label);
 }
 
 void IRProc::end_proc() {
@@ -39,10 +39,8 @@ void IRProc::end_proc() {
 }
 
 void IRProc::add_block() {
-  if (current_block_->size()) {
-    current_block_->end_block();
-    blocks_.push_back(std::move(current_block_));
-  }
+  current_block_->end_block();
+  blocks_.push_back(std::move(current_block_));
 }
 
 void IRProc::process() { /* now perform variable use information */

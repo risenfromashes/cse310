@@ -55,6 +55,8 @@ std::string_view to_string(Op8086 op) {
     return "INC";
   case Op8086::DEC:
     return "DEC";
+  case Op8086::CMP:
+    return "CMP";
   }
 }
 
@@ -100,6 +102,18 @@ Op8086 map_code(IROp op) {
     return Op8086::SAL;
   case IROp::RSHIFT:
     return Op8086::SAR;
+  case IROp::LESS:
+    return Op8086::JL;
+  case IROp::LEQ:
+    return Op8086::JLE;
+  case IROp::GREAT:
+    return Op8086::JG;
+  case IROp::GEQ:
+    return Op8086::JGE;
+  case IROp::EQ:
+    return Op8086::JE;
+  case IROp::NEQ:
+    return Op8086::JNE;
   default:
     return Op8086::LEA;
   }
@@ -160,7 +174,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     auto addr = instr->arg1().addr();
     if (instr->op() == IROp::PTRLD) {
       /* spill everything except addr in a register */
-      Register *reg = Register::min_cost(registers_, instr, addr);
+      Register *reg = Register::min_spill_reg(registers_, instr, nullptr, addr);
       spill(reg, instr, addr);
       reg->clear();
       print_instr(Op8086::MOV, reg->name(), asm_addr);
@@ -176,7 +190,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
         /* no register holds this addr */
         assert(!addr->is_dirty());
 
-        Register *reg = Register::min_cost(registers_, instr);
+        Register *reg = Register::min_spill_reg(registers_, instr);
         spill(reg, instr);
         reg->clear();
 
@@ -192,30 +206,40 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     // perhaps implement constant propagation?
     auto r = instr->arg2();
     auto addr = instr->arg1().addr();
+    addr->clear_registers();
+
     if (r.is_imd_int()) {
-      if (addr->reg_count() && addr->get_register()->contains_only(addr)) {
+      Register *reg = nullptr;
+      for (auto rg : addr->registers()) {
+        if (rg->contains_only(addr)) {
+          reg = rg;
+          break;
+        }
+      }
+      if (reg) {
         // if a register holds value exclusively update it
-        auto reg = addr->get_register();
         addr->set_dirty(true);
-        addr->clear_registers();
         addr->add_register(reg);
         print_instr(Op8086::MOV, reg->name(), r.imd_int());
       } else {
         // otherwise just write to memory
         addr->set_dirty(false);
-        addr->clear_registers();
         print_instr(Op8086::MOV, gen_addr(addr), r.imd_int());
       }
     } else {
       auto raddr = r.addr();
       // load addr to register (if not already in one)
-      Register *reg = Register::min_cost(registers_, instr, raddr);
-      spill(reg, instr, raddr);
-      reg->clear();
+      Register *reg;
+      if (raddr->reg_count()) {
+        reg = raddr->get_register();
+      } else {
+        reg = Register::min_spill_reg(registers_, instr, nullptr, raddr);
+        spill(reg, instr, raddr);
+        reg->clear();
+      }
       raddr->add_register(reg);
       /* only held by reg now */
       addr->set_dirty(true);
-      addr->clear_registers();
       addr->add_register(reg);
     }
   } break;
@@ -226,49 +250,48 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
   case IROp::SUB: {
     auto op = map_code(instr->op());
     auto addr = instr->arg1().addr();
-    if (instr->arg2().is_imd_int() || instr->arg3().is_imd_int()) {
-      auto arg = instr->arg2().is_imd_int() ? instr->arg3() : instr->arg2();
-      auto raddr = arg.addr();
+    auto arg1 = instr->arg1();
+    auto arg2 = instr->arg2();
 
-      auto reg = load_addr_into_reg(raddr, instr, addr);
+    if (arg1.is_imd_int()) {
+      std::swap(arg1, arg2);
+    }
+
+    if (arg2.is_imd_int()) {
+      auto raddr = arg1.addr();
+
+      auto reg = spill_and_load(raddr, instr, addr);
       reg->clear();
-      print_instr(op, reg->name(), arg.imd_int());
+      print_instr(op, reg->name(), arg2.imd_int());
+
+      if (instr->arg1().is_imd_int() && op == Op8086::SUB) {
+        // only SUB is not commutative
+        print_instr(Op8086::NEG, reg->name());
+      }
 
       addr->set_dirty(true);
       addr->clear_registers();
       addr->add_register(reg);
-    } else if (instr->arg2().addr()->reg_count() ||
-               instr->arg3().addr()->reg_count()) {
+    } else {
       auto regaddr = instr->arg2().addr();
       auto otheraddr = instr->arg3().addr();
 
+      // assume that if value in register, cost will be lower
       if (!regaddr->reg_count()) {
         std::swap(regaddr, otheraddr);
       }
 
       std::string otheraddrstr;
+      Register *other_reg = nullptr;
       if (otheraddr->is_dirty()) {
         assert(otheraddr->reg_count());
-        otheraddrstr = otheraddr->get_register()->name();
+        other_reg = otheraddr->get_register();
+        otheraddrstr = other_reg->name();
       } else {
         otheraddrstr = gen_addr(otheraddr);
       }
 
-      auto reg = regaddr->get_register();
-      reg->clear();
-
-      print_instr(op, reg->name(), otheraddrstr);
-
-      addr->set_dirty(true);
-      addr->clear_registers();
-      reg->add_address(addr);
-    } else {
-      auto regaddr = instr->arg2().addr();
-      auto otheraddr = instr->arg3().addr();
-
-      std::string otheraddrstr = gen_addr(otheraddr);
-
-      auto reg = load_addr_into_reg(regaddr, instr, addr);
+      auto reg = spill_and_load(regaddr, instr, addr, other_reg);
       reg->clear();
 
       print_instr(op, reg->name(), otheraddrstr);
@@ -287,7 +310,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     auto raddr = instr->arg2().addr();
     auto addr = instr->arg1().addr();
     // Get a register and load raddr into it
-    Register *reg = load_addr_into_reg(raddr, instr, addr);
+    Register *reg = spill_and_load(raddr, instr, addr);
     reg->clear();
 
     addr->set_dirty(true);
@@ -298,10 +321,115 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
   } break;
   case IROp::LSHIFT:
   case IROp::RSHIFT: {
-  };
-  case IROp::MUL:
+    auto op = map_code(instr->op());
+    auto addr = instr->arg1().addr();
+    auto larg = instr->arg2();
+    auto rarg = instr->arg3();
+    if (rarg.is_imd_int()) {
+      // load larg into any register
+      auto raddr = larg.addr();
+      auto reg = spill_and_load(raddr, instr, addr);
+      reg->clear();
+
+      print_instr(op, reg->name(), rarg.imd_int());
+      addr->set_dirty(true);
+      addr->clear_registers();
+      addr->add_register(reg);
+    } else {
+      // load rarg into CX
+      // load larg into any register except CX
+
+      // arg2 can be immediate
+      IRAddress *raddr = nullptr;
+      raddr = larg.addr();
+
+      auto saddr = rarg.addr();
+      // load into register
+      Register *reg =
+          Register::min_spill_reg(registers_, instr, cx, addr, raddr);
+
+      bool contained = raddr && reg->contains(raddr);
+      spill(reg, instr, addr);
+
+      if (raddr) {
+        if (!contained) {
+          if (!raddr->is_dirty()) {
+            print_instr(Op8086::MOV, reg->name(), gen_addr(raddr));
+          } else {
+            print_instr(Op8086::MOV, reg->name(),
+                        raddr->get_register()->name());
+          }
+        }
+      } else {
+        print_instr(Op8086::MOV, reg->name(), larg.imd_int());
+      }
+      reg->clear();
+
+      spill(cx, instr);
+      if (!cx->contains(saddr)) {
+        if (!saddr->is_dirty()) {
+          print_instr(Op8086::MOV, reg->name(), gen_addr(saddr));
+        } else {
+          print_instr(Op8086::MOV, reg->name(), saddr->get_register()->name());
+        }
+        saddr->add_register(cx);
+      }
+      cx->clear();
+
+      print_instr(op, reg->name(), "CL");
+      addr->set_dirty(true);
+      addr->clear_registers();
+      addr->add_register(reg);
+    }
+  } break;
+  case IROp::MUL: {
+    auto addr = instr->arg1().addr();
+    auto arg1 = instr->arg2();
+    auto arg2 = instr->arg2();
+
+    // but both cannot be immediate
+    if (arg1.is_imd_int()) {
+      std::swap(arg1, arg2);
+    }
+
+    auto raddr1 = arg1.addr();
+    // dx must be spilled
+    spill(dx, instr, addr);
+    dx->clear();
+    // operand1 must be in AX
+    bool contained = ax->contains(raddr1);
+    spill(ax, instr, addr);
+    if (!contained) {
+      if (!raddr1->is_dirty()) {
+        print_instr(Op8086::MOV, ax->name(), gen_addr(raddr1));
+      } else {
+        print_instr(Op8086::MOV, ax->name(), raddr1->get_register()->name());
+      }
+    }
+    // operand2 must be in register or memory
+    Register *reg = nullptr;
+    if (arg2.is_imd_int()) {
+      // then just load to some register
+      reg = Register::min_spill_reg({bx, cx}, instr);
+      print_instr(Op8086::MOV, reg->name(), arg2.imd_int());
+    } else if (arg2.addr()->reg_count()) {
+      reg = arg2.addr()->get_register();
+    }
+    if (reg) {
+      print_instr(Op8086::IMUL, reg->name());
+    } else {
+      assert(!arg2.addr()->is_dirty());
+      print_instr(Op8086::IMUL, gen_addr(arg2.addr()));
+    }
+
+    addr->set_dirty(true);
+    addr->clear_registers();
+    addr->add_register(ax);
+  } break;
   case IROp::DIV:
-  case IROp::MOD:
+  case IROp::MOD: {
+
+  } break;
   case IROp::JMPIF:
     print_instr(cjmp_op_, instr->arg2());
     break;
@@ -313,22 +441,12 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     print_instr(Op8086::JMP, instr->arg1());
     break;
   case IROp::LESS:
-    cjmp_op_ = Op8086::JL;
-    break;
   case IROp::LEQ:
-    cjmp_op_ = Op8086::JLE;
-    break;
   case IROp::GREAT:
-    cjmp_op_ = Op8086::JG;
-    break;
   case IROp::GEQ:
-    cjmp_op_ = Op8086::JGE;
-    break;
   case IROp::EQ:
-    cjmp_op_ = Op8086::JE;
-    break;
   case IROp::NEQ:
-    cjmp_op_ = Op8086::JNE;
+    cjmp_op_ = map_code(instr->op());
     break;
   case IROp::PARAM:
     if (!call_seq_) {
@@ -352,7 +470,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     if (instr->has_arg2()) {
       /* there is return value*/
       /* save to a register for now */
-      auto reg = Register::min_cost(registers_, instr);
+      auto reg = Register::min_spill_reg(registers_, instr);
       auto arg = instr->arg2().var();
       // spill reg
       spill(reg, instr);
@@ -403,6 +521,7 @@ std::string CodeGen8086::gen_stack_addr(int off, bool with_si) {
 }
 
 void CodeGen8086::store(Register *reg, IRAddress *addr) {
+  addr->set_dirty(false);
   print_instr(Op8086::MOV, gen_addr(addr), reg->name());
 }
 
@@ -422,12 +541,13 @@ void CodeGen8086::spill(Register *reg, IRInstr *instr, IRAddress *except) {
   for (auto &addr : reg->addresses()) {
     if (addr != except && instr->next_use().contains(addr)) {
       /* no use saving information which is never used again */
-      if (addr->is_dirty()) {
-        /* only store value if value is not up to date */
+      if (addr->is_dirty() && addr->reg_count() == 1) {
+        /* only store value if value is not up to date  and not saved anywhere*/
         store(reg, addr);
         addr->set_dirty(false);
       }
     }
+    addr->remove_register(reg);
   }
 }
 
@@ -439,18 +559,13 @@ int CodeGen8086::effective_offset(int offset) {
   }
 }
 
-Register *CodeGen8086::load_addr_into_reg(IRAddress *addr, IRInstr *instr,
-                                          IRAddress *spill_except) {
-  Register *reg;
-  if (addr->reg_count()) {
-    reg = addr->get_register();
-  } else {
-    assert(!addr->is_dirty());
-    // load into register
-    reg = Register::min_cost(registers_, instr, spill_except);
-    spill(reg, instr, spill_except);
-
+Register *CodeGen8086::spill_and_load(IRAddress *addr, IRInstr *instr,
+                                      IRAddress *spill_except, Register *skip) {
+  Register *reg =
+      Register::min_spill_reg(registers_, instr, skip, spill_except, addr);
+  if (!reg->contains(addr)) {
     print_instr(Op8086::MOV, reg->name(), gen_addr(addr));
   }
+  spill(reg, instr, spill_except);
   return reg;
 }

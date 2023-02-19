@@ -4,7 +4,7 @@
 
 Register::Register(std::string name) : name_(std::move(name)) {}
 
-int Register::spill_cost(IRInstr *instr, IRAddress *except) {
+int Register::spill_cost(IRInstr *instr, IRAddress *except, IRAddress *keep) {
   int cost = 0;
   auto &srcs = instr->srcs();
   auto dest = instr->dest();
@@ -37,34 +37,44 @@ int Register::spill_cost(IRInstr *instr, IRAddress *except) {
     /* otherwise must spill :( */
     cost++;
   }
+  if (keep && contains(keep)) {
+    cost--;
+  }
   return cost;
 }
 
-Register *Register::min_cost(std::initializer_list<Register *> list,
-                             IRInstr *instr, IRAddress *except) {
+Register *Register::min_spill_reg(std::initializer_list<Register *> list,
+                                  IRInstr *instr, Register *skip,
+                                  IRAddress *except, IRAddress *keep) {
   assert(list.size());
   int min_cost = 1e9;
   Register *min = nullptr;
   for (auto *reg : list) {
-    int cost = reg->spill_cost(instr, except);
-    if (cost < min_cost) {
-      min_cost = cost;
-      min = reg;
+    if (reg != skip) {
+      int cost = reg->spill_cost(instr, except, keep);
+      if (cost < min_cost) {
+        min_cost = cost;
+        min = reg;
+      }
     }
   }
   return min;
 }
 
-Register *Register::min_cost(const std::vector<std::unique_ptr<Register>> &list,
-                             IRInstr *instr, IRAddress *except) {
+Register *
+Register::min_spill_reg(const std::vector<std::unique_ptr<Register>> &list,
+                        IRInstr *instr, Register *skip, IRAddress *except,
+                        IRAddress *keep) {
   assert(list.size());
   int min_cost = 1e9;
   Register *min = nullptr;
   for (auto &reg : list) {
-    int cost = reg->spill_cost(instr, except);
-    if (cost < min_cost) {
-      min_cost = cost;
-      min = reg.get();
+    if (reg.get() != skip) {
+      int cost = reg->spill_cost(instr, except, keep);
+      if (cost < min_cost) {
+        min_cost = cost;
+        min = reg.get();
+      }
     }
   }
   return min;
