@@ -201,7 +201,7 @@ public:
   IRArg arg2() const;
   IRArg arg3() const;
 
-  const NextUseInfo &next_use() { return next_use_; }
+  const NextUseInfo &next_use() const { return next_use_; }
   void set_next_use(NextUseInfo nu) { next_use_ = std::move(nu); }
 
   const std::set<IRAddress *> &srcs() { return src_vars_; }

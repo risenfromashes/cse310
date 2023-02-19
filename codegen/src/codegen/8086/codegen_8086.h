@@ -6,6 +6,7 @@
 #include <fstream>
 
 enum class Op8086 {
+  INT,
   MOV,
   ADD,
   SUB,
@@ -41,6 +42,8 @@ constexpr int REG_COUNT_8086 = 4;
 std::string_view to_string(Op8086 op);
 Op8086 map_opcode(IROp op);
 Op8086 negate(Op8086 op);
+bool is_div(IROp op);
+bool is_commutative(IROp op);
 
 class CodeGen8086 : public CodeGen {
 public:
@@ -62,11 +65,16 @@ public:
   int effective_offset(int offset);
 
   void spill(Register *reg, IRInstr *instr, IRAddress *except = nullptr);
+  void spill_all(IRInstr *instr);
+
+  void gen();
 
 private:
   // loads addr into register (doesn't clear reg)
   Register *spill_and_load(IRAddress *addr, IRInstr *instr,
                            IRAddress *spill_except, Register *skip = nullptr);
+  // function return sequence
+  void proc_ret();
 
   bool call_seq_ = false;
   std::ofstream out_file_;
@@ -74,6 +82,4 @@ private:
   Register *ax, *bx, *cx, *dx;
 
   Op8086 cjmp_op_;
-
-  int stack_start_;
 };

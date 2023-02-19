@@ -16,10 +16,11 @@ public:
   virtual void gen_global(IRGlobal *global) = 0;
 
 protected:
+  void print_instr(auto op);
   void print_instr(auto op, auto &&a1);
   void print_instr(auto op, auto &&a1, auto &&a2);
   void print_instr(auto op, auto &&a1, auto &&a2, auto &&a3);
-  void print_label(std::string &label);
+  void print_label(std::string_view label);
 
   IRProgram *program_;
   std::ofstream out_file_;

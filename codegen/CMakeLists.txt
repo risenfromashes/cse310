@@ -17,6 +17,9 @@ find_package(BISON)
 FLEX_TARGET(scanner src/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/lexer.yy.cc
             DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/lexer.yy.h)
 
+FLEX_TARGET(ir_scanner src/ir/lexer.l ${CMAKE_CURRENT_BINARY_DIR}/ir_lexer.yy.cc
+            DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/ir_lexer.yy.h)
+
 BISON_TARGET(parser src/parser.y ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.cc
             COMPILE_FLAGS "-Wcounterexamples"
             DEFINES_FILE ${CMAKE_CURRENT_BINARY_DIR}/parser.tab.h)
@@ -25,6 +28,7 @@ add_executable(compiler
   src/main.cc
   ${BISON_parser_OUTPUTS}
   ${FLEX_scanner_OUTPUTS}
+  ${FLEX_ir_scanner_OUTPUTS}
   src/parser_context.h
   src/parser_context.cc
   src/token.h
@@ -55,12 +59,28 @@ add_executable(compiler
   src/ast/decl.cc
   src/ast/type.h
   src/ast/type.cc
-  src/codegen/8086/preprocessor.h
-  src/codegen/8086/preprocessor.cc
   src/ir/ir_gen.h
   src/ir/ir_gen.cc
   src/ir/ir_instr.h
   src/ir/ir_instr.cc
+  src/ir/ir_block.h
+  src/ir/ir_block.cc
+  src/ir/ir_proc.h
+  src/ir/ir_proc.cc
+  src/ir/ir_token.h
+  src/ir/ir_token.cc
+  src/ir/ir_program.h
+  src/ir/ir_program.cc
+  src/ir/ir_parser.h
+  src/ir/ir_parser.cc
+  src/codegen/register.h
+  src/codegen/register.cc
+  src/codegen/codegen.h
+  src/codegen/codegen.cc
+  src/codegen/8086/preprocessor.h
+  src/codegen/8086/preprocessor.cc
+  src/codegen/8086/codegen_8086.h
+  src/codegen/8086/codegen_8086.cc
 )
 
 target_link_libraries(compiler PRIVATE fmt::fmt)

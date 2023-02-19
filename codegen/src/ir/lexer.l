@@ -21,7 +21,7 @@ id ((_|{letter})(_|{alphanum})*)
 %%
 
 {ws}             { }
-"\n"             { yyextra->new_line();                          }
+";".*"\n"        { yyextra->new_line();                          }
 
 PTRST            { yyextra->add_token(IRToken(IROp::PTRST));     }
 PTRLD            { yyextra->add_token(IRToken(IROp::PTRLD));     }
@@ -73,6 +73,10 @@ void IRParser::init_scanner()
 {
     yylex_init_extra(this, &scanner_);
     yyset_in(in_file_, scanner_);
+}
+
+void IRParser::scan(){
+    yylex(scanner_);
 }
 
 void IRParser::finish_scanner(){

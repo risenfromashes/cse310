@@ -10,6 +10,7 @@
 class IRProgram {
   friend class IRParser;
 
+public:
   auto &globals() { return globals_; }
   auto &procs() { return procs_; }
   auto &labels() { return labels_; }

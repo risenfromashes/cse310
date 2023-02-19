@@ -32,7 +32,7 @@ public:
 
   size_t size() { return instrs_.size(); }
 
-  const std::vector<IRInstr> &instrs();
+  std::vector<IRInstr> &instrs();
   IRInstr &last_instr();
 
   int stack_offset() { return stack_offset_; }

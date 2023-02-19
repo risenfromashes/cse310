@@ -10,7 +10,11 @@
 
 class IRParser {
 public:
+  IRParser(const char *file);
+  ~IRParser();
+
   void init_scanner();
+  void scan();
   void finish_scanner();
 
   IRLabel *get_label(int id);
@@ -26,7 +30,9 @@ public:
   void add_instr(IRInstr instr);
   void add_label(IRLabel *label);
 
-  IRProgram &program() { return program_; }
+  IRProgram *program() { return &program_; }
+
+  void parse();
 
 private:
   void *scanner_;
@@ -35,4 +41,6 @@ private:
   std::unique_ptr<IRProc> current_proc_;
 
   IRProgram program_;
+
+  FILE *in_file_;
 };

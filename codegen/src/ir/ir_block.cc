@@ -76,7 +76,7 @@ void IRBlock::end_block() {
   process();
 }
 
-const std::vector<IRInstr> &IRBlock::instrs() {
+std::vector<IRInstr> &IRBlock::instrs() {
   assert(!instrs_.empty());
   return instrs_;
 }

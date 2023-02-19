@@ -14,7 +14,10 @@ IRGenerator::IRGenerator(const char *file) : out_file_(file) {
   context_stack_.push(IRGenContext(true));
 }
 
-void IRGenerator::generate(ASTNode *node) { node->visit(this); }
+void IRGenerator::generate(ASTNode *node) {
+  node->visit(this);
+  out_file_.close();
+}
 
 VarOrImmediate::VarOrImmediate(std::string var) : data_(std::move(var)) {}
 VarOrImmediate::VarOrImmediate(int64_t imd) : data_(imd) {}

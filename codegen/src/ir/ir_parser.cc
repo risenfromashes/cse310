@@ -1,6 +1,14 @@
 #include "ir_parser.h"
 #include "ir/ir_proc.h"
 
+IRParser::IRParser(const char *in) {
+  in_file_ = std::fopen(in, "r");
+  assert(in_file_);
+  init_scanner();
+}
+
+IRParser::~IRParser() { finish_scanner(); }
+
 IRLabel *IRParser::get_label(int id) {
   if (!program_.labels_.contains(id)) {
     program_.labels_.emplace(id, std::make_unique<IRLabel>(id));
@@ -54,8 +62,10 @@ void IRParser::new_line() {
       break;
     }
 
-    /* otherwise just instruction to current proc */
-    if (current_line_.size() == 2) {
+    /* otherwise just add instruction to current proc */
+    if (current_line_.size() == 1) {
+      add_instr(IRInstr(opcode));
+    } else if (current_line_.size() == 2) {
       add_instr(IRInstr(opcode, current_line_[1].arg()));
     } else if (current_line_.size() == 3) {
       add_instr(
@@ -95,4 +105,9 @@ void IRParser::add_label(IRLabel *label) {
 
 void IRParser::add_token(IRToken token) {
   current_line_.push_back(std::move(token));
+}
+
+void IRParser::parse() {
+  scan();
+  new_line();
 }

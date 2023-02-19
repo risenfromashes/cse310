@@ -18,6 +18,8 @@ public:
   /* seal and call process */
   void end_proc();
 
+  std::vector<std::unique_ptr<IRBlock>> &blocks() { return blocks_; }
+
 private:
   void find_succ_pre();
   void find_liveness();
