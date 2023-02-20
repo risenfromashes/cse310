@@ -114,7 +114,7 @@ func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
         $$ = NonTerminal::create(context, @$, "func_declaration", $1, $2, $3, $4, $5, $6);
         $$->ast = FuncDecl::create(context, @$, $1->type(),
                                     std::move($4->paramdecls()),
-                                    $2->value(), nullptr);
+                                    $2->value());
         
         /* no declaration to follow */
         context->current_params(nullptr);
@@ -123,24 +123,26 @@ func_declaration : type_specifier ID LPAREN parameter_list RPAREN SEMICOLON {
         $$ = NonTerminal::create(context, @$, "func_declaration", $1, $2, $3, $4, $5);
         $$->ast = FuncDecl::create(context, @$, $1->type(), 
                                     ParamDecls(),
-                                    $2->value(), nullptr);
+                                    $2->value());
         /* no declaration to follow */
         context->current_params(nullptr);
     }
 		;
 		 
-func_definition : type_specifier ID LPAREN parameter_list RPAREN compound_statement {
-        $$ = NonTerminal::create(context, @$, "func_definition", $1, $2, $3, $4, $5, $6);
-        $$->ast = FuncDecl::create(context, @$, $1->type(), 
-                                    std::move($4->paramdecls()),
-                                    $2->value(), std::move($6->stmt()));
-    }
-		| type_specifier ID LPAREN RPAREN compound_statement {
-        $$ = NonTerminal::create(context, @$, "func_definition", $1, $2, $3, $4, $5);
-        $$->ast = FuncDecl::create(context, @$, $1->type(), 
-                                    ParamDecls(),
-                                    $2->value(), std::move($5->stmt())); 
-    }
+func_definition : type_specifier ID LPAREN parameter_list RPAREN {
+			context->current_func(FuncDecl::create(context, @1, $1->type(), 
+                                    std::move($4->paramdecls()), $2->value()));
+		} compound_statement {
+        	$$ = NonTerminal::create(context, @$, "func_definition", $1, $2, $3, $4, $5, $7);
+			$$->ast = context->define_current_func(std::move($7->stmt()));
+    	}
+		| type_specifier ID LPAREN RPAREN {
+			context->current_func(FuncDecl::create(context, @1, $1->type(), 
+                                    ParamDecls(), $2->value()));			
+		} compound_statement {
+        	$$ = NonTerminal::create(context, @$, "func_definition", $1, $2, $3, $4, $6);
+			$$->ast = context->define_current_func(std::move($6->stmt()));
+    	}
  		;				
 
 
@@ -189,13 +191,13 @@ compound_statement :  LCURL { context->enter_scope(); }
                               $$ = NonTerminal::create(context, @$, "compound_statement", $1, $3, $4);
                               $$->ast = CompoundStmt::create(context, @$, std::move($3->stmts()));
                               context->exit_scope();
-                             }
- 		    | LCURL { context->enter_scope(); } 
-          RCURL {
-          $$ = NonTerminal::create(context, @$, "compound_statement", $1, $3);
-          $$->ast = CompoundStmt::create(context, @$, Stmts());
-          context->exit_scope();
-        }
+                      }
+ 		    | 	LCURL { context->enter_scope(); } 
+          		RCURL {
+          				$$ = NonTerminal::create(context, @$, "compound_statement", $1, $3);
+          				$$->ast = CompoundStmt::create(context, @$, Stmts());
+          				context->exit_scope();
+        			  }
  		    ;
  		    
 var_declaration : type_specifier declaration_list SEMICOLON {
@@ -207,7 +209,7 @@ var_declaration : type_specifier declaration_list SEMICOLON {
 type_specifier	: INT { 
 			$$ = NonTerminal::create(context, @$, "type_specifier", $1); 
 			$$->ast = context->get_built_in_type(BuiltInTypeName::INT);
-      context->current_type($$->type());
+      		context->current_type($$->type());
 		}
  		| FLOAT {
 			$$ = NonTerminal::create(context, @$, "type_specifier", $1); 

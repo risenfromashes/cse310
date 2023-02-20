@@ -15,7 +15,10 @@ public:
   float spill_cost(IRInstr *instr, IRAddress *except = nullptr,
                    IRAddress *keep = nullptr);
 
-  std::string_view name() { return name_; }
+  std::string_view name() {
+    accessed_ = true;
+    return name_;
+  }
 
   static Register *min_spill_reg(std::initializer_list<Register *> list,
                                  IRInstr *instr, Register *skip = nullptr,

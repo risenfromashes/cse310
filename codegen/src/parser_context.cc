@@ -53,6 +53,11 @@ Token *ParserContext::new_token(int lineno, const char *text,
 }
 
 void ParserContext::enter_scope() {
+  std::cout << "entering scope" << std::endl;
+  std::cout << "has current params: " << (bool)current_params_ << std::endl;
+  if (current_params_) {
+    std::cout << "n param: " << current_params_->size() << std::endl;
+  }
   table_.enter_scope();
   if (current_params()) {
     for (auto &param : *current_params()) {
@@ -180,3 +185,22 @@ void ParserContext::print_ast() {
 }
 
 void ParserContext::print_pt() { pt_root_->print(this, 0); }
+
+std::unique_ptr<FuncDecl>
+ParserContext::define_current_func(std::unique_ptr<Stmt> def) {
+  assert(current_func_);
+  auto decl = dynamic_cast<FuncDecl *>(lookup_decl(current_func_->name()));
+  assert(decl);
+  if (decl->definition()) {
+    report_error(current_func_->location(), "Redefinition of function '{}'",
+                 current_func_->name());
+  } else {
+    decl->set_definition(std::move(def));
+  }
+  return std::move(current_func_);
+}
+
+void ParserContext::current_func(std::unique_ptr<FuncDecl> func) {
+  current_func_ = std::move(func);
+  current_params_ = &current_func_->params_;
+}

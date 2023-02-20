@@ -20,6 +20,8 @@ public:
 
   std::vector<std::unique_ptr<IRBlock>> &blocks() { return blocks_; }
 
+  void remove_block(IRBlock *block);
+
 private:
   void find_succ_pre();
   void find_liveness();

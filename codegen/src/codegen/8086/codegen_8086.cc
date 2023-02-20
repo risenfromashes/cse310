@@ -350,11 +350,12 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       addr->clear_registers();
       addr->add_register(reg);
     } else {
-      auto regaddr = instr->arg2().addr();
-      auto otheraddr = instr->arg3().addr();
+      auto regaddr = arg1.addr();
+      auto otheraddr = arg2.addr();
 
       // assume that if value in register, cost will be lower
-      if (!regaddr->reg_count()) {
+      // since SUB is not commutative, skip this for SUB
+      if (!regaddr->reg_count() && op != Op8086::SUB) {
         std::swap(regaddr, otheraddr);
       }
 
@@ -713,7 +714,6 @@ void CodeGen8086::gen_proc(IRProc *proc) {
         print_instr(Op8086::PUSH, reg->name());
         stack_start_ += 2;
       }
-      reg->reset();
     }
     // update BP only if the stack was ever used
     if (stack_accessed_) {

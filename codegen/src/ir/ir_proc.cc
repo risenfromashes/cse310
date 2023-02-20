@@ -94,6 +94,32 @@ void IRProc::find_succ_pre() {
       }
     }
   }
+
+  if (blocks_.size()) {
+    /* perform dfs */
+    /* remove unreachable blocks */
+    std::set<IRBlock *> visited;
+    std::stack<IRBlock *> stack;
+    stack.push(blocks_[0].get());
+
+    while (!stack.empty()) {
+      auto c = stack.top();
+      stack.pop();
+      if (visited.contains(c)) {
+        continue;
+      }
+      visited.insert(c);
+      for (auto &succ : c->succ_) {
+        stack.push(succ);
+      }
+    }
+
+    for (auto &block : blocks_) {
+      if (!visited.contains(block.get())) {
+        remove_block(block.get());
+      }
+    }
+  }
 }
 
 void IRProc::find_liveness() {
@@ -246,6 +272,15 @@ void IRProc::alloc_vars() {
       for (auto &succ : c->succ_) {
         stack.push(succ);
       }
+    }
+  }
+}
+
+void IRProc::remove_block(IRBlock *block) {
+  for (auto itr = blocks_.begin(); itr != blocks_.end(); ++itr) {
+    if (itr->get() == block) {
+      blocks_.erase(itr);
+      break;
     }
   }
 }

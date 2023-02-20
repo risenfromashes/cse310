@@ -69,15 +69,15 @@ public:
 };
 
 class FuncDecl : public TypeDecl {
+  friend class ParserContext;
+
 public:
   FuncDecl(ParserContext *context, Location loc, std::shared_ptr<FuncType> type,
-           std::vector<std::unique_ptr<ParamDecl>> params, std::string name,
-           CompoundStmt *defintion);
+           std::vector<std::unique_ptr<ParamDecl>> params, std::string name);
 
   static std::unique_ptr<FuncDecl>
   create(ParserContext *context, Location loc, Type *ret_type,
-         std::vector<std::unique_ptr<ParamDecl>> params, std::string name,
-         std::unique_ptr<Stmt> definition = nullptr);
+         std::vector<std::unique_ptr<ParamDecl>> params, std::string name);
 
   void visit(ASTVisitor *visitor) override { visitor->visit_func_decl(this); }
 
@@ -92,6 +92,7 @@ public:
   const std::vector<std::unique_ptr<ParamDecl>> &params() { return params_; }
 
 private:
+  void set_definition(std::unique_ptr<Stmt> stmt);
   std::vector<std::unique_ptr<ParamDecl>> params_;
   std::unique_ptr<CompoundStmt> definition_;
 };

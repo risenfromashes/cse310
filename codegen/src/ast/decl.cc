@@ -58,17 +58,15 @@ std::unique_ptr<ParamDecl> ParamDecl::create(ParserContext *context,
 FuncDecl::FuncDecl(ParserContext *context, Location loc,
                    std::shared_ptr<FuncType> type,
                    std::vector<std::unique_ptr<ParamDecl>> params,
-                   std::string name, CompoundStmt *definition)
+                   std::string name)
     : TypeDecl(context, loc, std::move(type), std::move(name)),
-      params_(std::move(params)), definition_(definition) {}
+      params_(std::move(params)) {}
 
 std::unique_ptr<FuncDecl>
 FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
                  std::vector<std::unique_ptr<ParamDecl>> params,
-                 std::string name, std::unique_ptr<Stmt> _definition) {
-  std::cerr << "creating function: " << name << std::endl;
+                 std::string name) {
   std::vector<Type *> param_types;
-  auto definition = dynamic_cast<CompoundStmt *>(_definition.release());
 
   for (auto &param : params) {
     param_types.push_back(param->type());
@@ -105,10 +103,6 @@ FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
           }
         }
       }
-      if (prev_func->definition() && definition) {
-        context->report_error(loc, "Redefinition of function '{}'", name);
-        valid = false;
-      }
     } else {
       context->report_error(loc, "'{}' redeclared as different kind of symbol",
                             name);
@@ -126,8 +120,7 @@ FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
     name = "invalid " + name;
   }
 
-  auto ret = new FuncDecl(context, loc, func_type, std::move(params), name,
-                          definition);
+  auto ret = new FuncDecl(context, loc, func_type, std::move(params), name);
 
   if (is_first_decl) {
     func_type->set_decl(ret);
@@ -138,6 +131,11 @@ FuncDecl::create(ParserContext *context, Location loc, Type *ret_type,
   }
 
   return std::unique_ptr<FuncDecl>(ret);
+}
+
+void FuncDecl::set_definition(std::unique_ptr<Stmt> stmt) {
+  definition_ = std::unique_ptr<CompoundStmt>(
+      dynamic_cast<CompoundStmt *>(stmt.release()));
 }
 
 TranslationUnitDecl::TranslationUnitDecl(

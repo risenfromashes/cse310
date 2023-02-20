@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ast/decl.h"
 #include "ast/type.h"
 #include "location.h"
 #include <array>
@@ -96,10 +97,12 @@ public:
   std::vector<std::unique_ptr<ParamDecl>> *current_params() {
     return current_params_;
   }
-
   void current_params(std::vector<std::unique_ptr<ParamDecl>> *params) {
     current_params_ = params;
   }
+
+  std::unique_ptr<FuncDecl> define_current_func(std::unique_ptr<Stmt> def);
+  void current_func(std::unique_ptr<FuncDecl> func);
 
   Type *current_type() { return current_type_; }
   void current_type(Type *type) { current_type_ = type; }
@@ -146,6 +149,7 @@ private:
   std::array<std::unique_ptr<BuiltInType>, BUILT_IN_TYPE_COUNT> built_in_types_;
 
   std::vector<std::unique_ptr<ParamDecl>> *current_params_;
+  std::unique_ptr<FuncDecl> current_func_;
 
   Type *current_type_;
 
