@@ -40,8 +40,13 @@ public:
     return contains(addr) && (addr_count() == 1);
   }
 
+  void reset() { accessed_ = false; }
+  bool accessed() { return accessed_; }
+
 private:
   std::set<IRAddress *> addresses_;
   std::string name_;
   float bias_;
+
+  bool accessed_ = false;
 };

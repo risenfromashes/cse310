@@ -3,7 +3,9 @@
 #include <cassert>
 
 Register::Register(std::string name, float bias)
-    : name_(std::move(name)), bias_(bias) {}
+    : name_(std::move(name)), bias_(bias) {
+  reset();
+}
 
 float Register::spill_cost(IRInstr *instr, IRAddress *except, IRAddress *keep) {
   float cost = bias_;
@@ -82,12 +84,14 @@ Register::min_spill_reg(const std::vector<std::unique_ptr<Register>> &list,
 }
 
 void Register::add_address(IRAddress *addr, bool update_addr) {
+  accessed_ = true;
   if (update_addr) {
     addr->add_register(this, false);
   }
   addresses_.insert(addr);
 }
 void Register::remove_address(IRAddress *addr, bool update_addr) {
+  accessed_ = true;
   if (update_addr) {
     addr->remove_register(this, false);
   }

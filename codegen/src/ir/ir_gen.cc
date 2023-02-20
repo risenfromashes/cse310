@@ -232,7 +232,8 @@ void IRGenerator::visit_call_expr(CallExpr *call_expr) {
   if (call_expr->func_type()->return_type()->is_void()) {
     print_ir_instr(IROp::CALL, current_var_, n);
   } else {
-    print_ir_instr(IROp::CALL, current_var_, new_temp(), n);
+    auto func = current_var_;
+    print_ir_instr(IROp::CALL, func, new_temp(), n);
   }
 }
 

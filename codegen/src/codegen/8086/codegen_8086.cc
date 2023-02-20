@@ -168,7 +168,7 @@ CodeGen8086::CodeGen8086(IRProgram *program, const char *out)
   bx = registers_[(int)BX].get();
   cx = registers_[(int)CX].get();
   dx = registers_[(int)DX].get();
-  stack_start_ = 2 * 3; // backing up 3 regisers
+  stack_start_ = 0; // backing up 3 regisers
 }
 
 void CodeGen8086::debug_print(IRAddress *addr) {
@@ -687,15 +687,38 @@ void CodeGen8086::gen_block(IRBlock *block) {
 
 void CodeGen8086::gen_proc(IRProc *proc) {
   out_file_ << proc->name() << " PROC" << std::endl;
+  stack_start_ = 0;
   if (proc->name() == "main") {
     print_instr(Op8086::MOV, "AX", "@DATA");
     print_instr(Op8086::MOV, "DS", "AX");
   } else {
-    print_instr(Op8086::PUSH, "BP");
-    print_instr(Op8086::PUSH, "BX");
-    print_instr(Op8086::PUSH, "CX");
-    print_instr(Op8086::PUSH, "DX");
-    print_instr(Op8086::MOV, "BP", "SP");
+    // dry run to find which registers are used
+    // and if the stack is ever used
+    dry_run_ = true;
+    stack_accessed_ = false;
+    for (auto &reg : registers_) {
+      reg->reset();
+    }
+    for (auto &block : proc->blocks()) {
+      gen_block(block.get());
+    }
+    dry_run_ = false;
+    // save BP only if the stack is used
+    if (stack_accessed_) {
+      print_instr(Op8086::PUSH, "BP");
+    }
+    // push the registers that were accessed
+    for (auto &reg : registers_) {
+      if (reg->accessed() && reg->name() != "AX") {
+        print_instr(Op8086::PUSH, reg->name());
+        stack_start_ += 2;
+      }
+      reg->reset();
+    }
+    // update BP only if the stack was ever used
+    if (stack_accessed_) {
+      print_instr(Op8086::MOV, "BP", "SP");
+    }
   }
   for (auto &block : proc->blocks()) {
     gen_block(block.get());
@@ -714,6 +737,7 @@ std::string CodeGen8086::gen_addr(IRAddress *addr) {
 }
 
 std::string CodeGen8086::gen_stack_addr(int off, bool with_si) {
+  stack_accessed_ = true;
   int offset = effective_offset(off);
   std::string offstr = (offset > 0 ? "+" : "") + std::to_string(offset);
   if (with_si) {
@@ -774,11 +798,18 @@ Register *CodeGen8086::spill_and_load(IRAddress *addr, IRInstr *instr,
 
 void CodeGen8086::proc_ret(IRProc *proc) {
   if (proc->name() != "main") {
-    print_instr(Op8086::MOV, "SP", "BP");
-    print_instr(Op8086::POP, "DX");
-    print_instr(Op8086::POP, "CX");
-    print_instr(Op8086::POP, "BX");
-    print_instr(Op8086::POP, "BP");
+    if (stack_accessed_) {
+      print_instr(Op8086::MOV, "SP", "BP");
+    }
+    for (int i = registers_.size() - 1; i >= 0; i--) {
+      auto reg = registers_[i].get();
+      if (reg->accessed() && reg->name() != "AX") {
+        print_instr(Op8086::POP, reg->name());
+      }
+    }
+    if (stack_accessed_) {
+      print_instr(Op8086::POP, "BP");
+    }
     print_instr(Op8086::RET);
   } else {
     print_instr(Op8086::MOV, "AH", "4CH");

@@ -57,6 +57,7 @@ ALLOC            { yyextra->add_token(IRToken(IROp::ALLOC));     }
 AALLOC           { yyextra->add_token(IRToken(IROp::AALLOC));    }
 GLOBAL           { yyextra->add_token(IRToken(IROp::GLOBAL));    }
 GLOBALARR        { yyextra->add_token(IRToken(IROp::GLOBALARR)); }
+PALLOC           { yyextra->add_token(IRToken(IROp::PALLOC));    }
 PARAM            { yyextra->add_token(IRToken(IROp::PARAM));     }
 CALL             { yyextra->add_token(IRToken(IROp::CALL));      }
 PROC             { yyextra->add_token(IRToken(IROp::PROC));      }
