@@ -63,17 +63,21 @@ std::ostream &operator<<(std::ostream &os, const VarOrImmediate &a) {
 void IRGenerator::gen_conditional_jump(ASTNode *n) {
   if (false_label_ && true_label_) {
     print_ir_instr(IROp::JMPIF, current_var_, *false_label_, n);
-    print_ir_instr(IROp::JMP, current_var_, *true_label_, n);
+    print_ir_instr(IROp::JMP, *true_label_, n);
   } else if (false_label_) {
-    print_ir_instr(IROp::JMPIF, current_var_, *false_label_, n);
+    // true is fall
+    // so jump if condition isn't met
+    print_ir_instr(IROp::JMPIFNOT, current_var_, *false_label_, n);
   } else if (true_label_) {
-    print_ir_instr(IROp::JMPIFNOT, current_var_, *true_label_, n);
+    // false is fall
+    // so jump if condition is met
+    print_ir_instr(IROp::JMPIF, current_var_, *true_label_, n);
   }
 }
 
 void IRGenerator::gen_expr_jump(ASTNode *n) {
   auto arg = current_var_;
-  print_ir_instr(IROp::EQ, new_temp(), arg, 0, n);
+  print_ir_instr(IROp::NEQ, new_temp(), arg, 0, n);
   gen_conditional_jump(n);
 }
 
@@ -108,14 +112,13 @@ void IRGenerator::visit_compound_stmt(CompoundStmt *compound_stmt) {
 void IRGenerator::visit_if_stmt(IfStmt *if_stmt) {
   ASTNode *n = if_stmt;
   jump_ = true;
-  auto next = new_label();
   if (if_stmt->else_case()) {
-    auto t = new_label();
+    auto t = nullopt;
     auto f = new_label();
+    auto next = new_label();
     true_label_ = t;
     false_label_ = f;
     if_stmt->condition()->visit(this);
-    print_ir_label(t);
     if_stmt->if_case()->visit(this);
     print_ir_instr(IROp::JMP, next, n);
     print_ir_label(f);
@@ -156,7 +159,7 @@ void IRGenerator::visit_for_stmt(ForStmt *for_stmt) {
   true_label_ = nullopt;
   false_label_ = exit;
   jump_ = true;
-  for_stmt->loop_condition()->visit(this);
+  for_stmt->loop_condition()->expr()->visit(this);
   for_stmt->body()->visit(this);
   jump_ = false;
   for_stmt->iteration_expr()->visit(this);
@@ -296,7 +299,7 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
     /* current_var_ unchanged */
     break;
   case MINUS:
-    print_ir_instr(IROp::SUB, new_temp(), 0, arg, n);
+    print_ir_instr(IROp::NEG, new_temp(), arg, n);
     break;
   case BIT_NEGATE:
     print_ir_instr(IROp::NOT, new_temp(), arg, n);
@@ -316,18 +319,20 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
     }
     break;
   case PRE_INC:
-    print_ir_instr(IROp::INC, new_temp(), arg, n);
+    print_ir_instr(IROp::INC, arg, arg, n);
+    current_var_ = arg.str();
     break;
   case PRE_DEC:
-    print_ir_instr(IROp::DEC, new_temp(), arg, n);
+    print_ir_instr(IROp::DEC, arg, arg, n);
+    current_var_ = arg.str();
     break;
   case POST_INC:
-    print_ir_instr(IROp::INC, new_temp(), arg, n);
-    current_var_ = arg.str();
+    print_ir_instr(IROp::COPY, new_temp(), arg, n);
+    print_ir_instr(IROp::INC, arg, arg, n);
     break;
   case POST_DEC:
-    print_ir_instr(IROp::DEC, new_temp(), arg, n);
-    current_var_ = arg.str();
+    print_ir_instr(IROp::COPY, new_temp(), arg, n);
+    print_ir_instr(IROp::DEC, arg, arg, n);
     break;
   case POINTER_DEREF:
     print_ir_instr(IROp::PTRLD, new_temp(), arg, 0, n);
@@ -540,12 +545,6 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
   case BIT_RIGHT_SHIFT:
     print_ir_instr(IROp::RSHIFT, new_temp(), arg1, arg2, n);
     break;
-  case REL_EQUALS:
-    print_ir_instr(IROp::EQ, new_temp(), arg1, arg2, n);
-    break;
-  case REL_NOT_EQUALS:
-    print_ir_instr(IROp::NEQ, new_temp(), arg1, arg2, n);
-    break;
   case LOGIC_AND: {
     if (const_eval2) {
       if (*const_eval2) {
@@ -629,6 +628,12 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
       }
     }
   } break;
+  case REL_EQUALS:
+    print_ir_instr(IROp::EQ, new_temp(), arg1, arg2, n);
+    break;
+  case REL_NOT_EQUALS:
+    print_ir_instr(IROp::NEQ, new_temp(), arg1, arg2, n);
+    break;
   case REL_GREATER:
     print_ir_instr(IROp::GREAT, new_temp(), arg1, arg2, n);
     break;
@@ -643,26 +648,28 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
     break;
   }
 
-  if (j0 && !is_logical(op)) {
-    gen_expr_jump(n);
-  }
-  if (is_relational(op)) {
-    if (j0) {
+  if (j0) {
+    if (is_relational(op)) {
+      /* for relational comparation has been done */
+      /* generate jump */
       gen_conditional_jump(n);
-    } else {
+    } else if (!is_logical(op)) {
+      gen_expr_jump(n);
+    }
+    /* for logical need to do nothing */
+    /* jump has been generated already */
+  } else {
+    if (is_relational(op)) {
       print_ir_instr(IROp::JMPIFNOT, current_var_, next, n);
       print_ir_instr(IROp::COPY, t, 1, n);
       print_ir_label(next);
       current_var_ = t;
-    }
-  }
-
-  if (is_logical(op)) {
-    if (!j0) {
+    } else if (is_logical(op)) {
       print_ir_instr(IROp::COPY, t, 1, n);
       print_ir_label(next);
       current_var_ = t;
     }
+    /* no special jumps need to be generated for normal operators */
   }
 }
 

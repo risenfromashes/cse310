@@ -35,33 +35,38 @@ IRGlobal *IRParser::get_global(std::string name) {
 }
 
 void IRParser::new_line() {
+
   if (current_line_.empty()) {
     return;
   }
+
   if (current_line_[0].is_opcode()) {
+    /* not a label */
+    last_label_ = std::nullopt;
+
     auto opcode = current_line_[0].opcode();
     /* global declarations are special cases */
     switch (opcode) {
-    case IROp::GLOBAL:
-      break;
+    case IROp::GLOBAL: {
+      assert(current_line_.size() == 2);
+      auto global = current_line_[1].arg().global();
+      global->set_size(1);
+    } break;
     case IROp::GLOBALARR: {
       assert(current_line_.size() == 3);
       auto global = current_line_[1].arg().global();
       auto size = current_line_[2].arg().imd_int();
       global->set_size(size);
-      break;
-    }
+    } break;
     case IROp::PROC: {
       assert(current_line_.size() == 2);
       auto global = current_line_[1].arg().global();
       std::cout << "new proc: " << global->name() << std::endl;
       new_proc(global);
-      break;
-    }
+    } break;
     case IROp::ENDP: {
       end_proc();
-      break;
-    };
+    } break;
     default:
       /* otherwise just add instruction to current proc */
       if (current_line_.size() == 1) {
@@ -102,8 +107,14 @@ void IRParser::add_instr(IRInstr instr) {
 }
 
 void IRParser::add_label(IRLabel *label) {
-  assert(current_proc_);
-  current_proc_->add_label(label);
+  if (!last_label_) {
+    assert(current_proc_);
+    current_proc_->add_label(label);
+    last_label_ = label;
+  } else {
+    /* two consecutive labels */
+    (*last_label_)->merge(label);
+  }
 }
 
 void IRParser::add_token(IRToken token) {

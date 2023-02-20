@@ -27,15 +27,17 @@ protected:
   std::ofstream out_file_;
 };
 
-void CodeGen::print_instr(auto op) { out_file_ << to_string(op) << std::endl; }
+void CodeGen::print_instr(auto op) {
+  out_file_ << "\t" << to_string(op) << std::endl;
+}
 
 void CodeGen::print_instr(auto op, auto &&a1) {
-  out_file_ << to_string(op) << " " << a1 << std::endl;
+  out_file_ << "\t" << to_string(op) << " " << a1 << std::endl;
 }
 void CodeGen::print_instr(auto op, auto &&a1, auto &&a2) {
-  out_file_ << to_string(op) << " " << a1 << ", " << a2 << std::endl;
+  out_file_ << "\t" << to_string(op) << " " << a1 << ", " << a2 << std::endl;
 }
 void CodeGen::print_instr(auto op, auto &&a1, auto &&a2, auto &&a3) {
-  out_file_ << to_string(op) << " " << a1 << ", " << a2 << ", " << a3
+  out_file_ << "\t" << to_string(op) << " " << a1 << ", " << a2 << ", " << a3
             << std::endl;
 }

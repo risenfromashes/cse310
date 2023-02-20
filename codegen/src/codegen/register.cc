@@ -2,10 +2,11 @@
 
 #include <cassert>
 
-Register::Register(std::string name) : name_(std::move(name)) {}
+Register::Register(std::string name, float bias)
+    : name_(std::move(name)), bias_(bias) {}
 
-int Register::spill_cost(IRInstr *instr, IRAddress *except, IRAddress *keep) {
-  int cost = 0;
+float Register::spill_cost(IRInstr *instr, IRAddress *except, IRAddress *keep) {
+  float cost = bias_;
   auto &srcs = instr->srcs();
   auto dest = instr->dest();
   for (auto addr : addresses_) {
@@ -47,11 +48,11 @@ Register *Register::min_spill_reg(std::initializer_list<Register *> list,
                                   IRInstr *instr, Register *skip,
                                   IRAddress *except, IRAddress *keep) {
   assert(list.size());
-  int min_cost = 1e9;
+  float min_cost = 1e9;
   Register *min = nullptr;
   for (auto *reg : list) {
     if (reg != skip) {
-      int cost = reg->spill_cost(instr, except, keep);
+      float cost = reg->spill_cost(instr, except, keep);
       if (cost < min_cost) {
         min_cost = cost;
         min = reg;
@@ -66,11 +67,11 @@ Register::min_spill_reg(const std::vector<std::unique_ptr<Register>> &list,
                         IRInstr *instr, Register *skip, IRAddress *except,
                         IRAddress *keep) {
   assert(list.size());
-  int min_cost = 1e9;
+  float min_cost = 1e9;
   Register *min = nullptr;
   for (auto &reg : list) {
     if (reg.get() != skip) {
-      int cost = reg->spill_cost(instr, except, keep);
+      float cost = reg->spill_cost(instr, except, keep);
       if (cost < min_cost) {
         min_cost = cost;
         min = reg.get();

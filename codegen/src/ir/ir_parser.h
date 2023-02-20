@@ -23,12 +23,11 @@ public:
   IRGlobal *get_global(std::string name);
 
   void new_line();
-
   void new_proc(IRGlobal *global);
   void end_proc();
-
   void add_token(IRToken token);
   void add_instr(IRInstr instr);
+
   void add_label(IRLabel *label);
 
   IRProgram *program() { return &program_; }
@@ -42,6 +41,7 @@ private:
   std::unique_ptr<IRProc> current_proc_;
 
   IRProgram program_;
+  std::optional<IRLabel *> last_label_;
 
   FILE *in_file_;
 };

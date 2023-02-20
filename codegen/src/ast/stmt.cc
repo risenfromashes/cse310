@@ -87,7 +87,7 @@ std::unique_ptr<Stmt> WhileStmt::create(ParserContext *context, Location loc,
 
 ForStmt::ForStmt(Location loc, ExprStmt *init, ExprStmt *cond, Expr *iter,
                  Stmt *body)
-    : Stmt(loc), init_(init), condition_(cond), iter_(iter) {}
+    : Stmt(loc), init_(init), condition_(cond), iter_(iter), body_(body) {}
 
 std::unique_ptr<Stmt> ForStmt::create(ParserContext *context, Location loc,
                                       std::unique_ptr<Stmt> _init,

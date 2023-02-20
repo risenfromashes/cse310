@@ -10,10 +10,10 @@ class IRAddress;
 
 class Register {
 public:
-  Register(std::string name);
+  Register(std::string name, float bias);
 
-  int spill_cost(IRInstr *instr, IRAddress *except = nullptr,
-                 IRAddress *keep = nullptr);
+  float spill_cost(IRInstr *instr, IRAddress *except = nullptr,
+                   IRAddress *keep = nullptr);
 
   std::string_view name() { return name_; }
 
@@ -42,6 +42,6 @@ public:
 
 private:
   std::set<IRAddress *> addresses_;
-
   std::string name_;
+  float bias_;
 };

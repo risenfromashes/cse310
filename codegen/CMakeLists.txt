@@ -67,6 +67,8 @@ add_executable(frontend
   src/ast/type.cc
   src/ir/ir_gen.h
   src/ir/ir_gen.cc
+  src/ir/ir_address.h
+  src/ir/ir_address.cc
   src/ir/ir_instr.h
   src/ir/ir_instr.cc
   src/codegen/register.h
@@ -81,6 +83,8 @@ add_backward(frontend)
 add_executable(backend8086
   src/backend8086.cc
   ${FLEX_ir_scanner_OUTPUTS}
+  src/ir/ir_address.h
+  src/ir/ir_address.cc
   src/ir/ir_instr.h
   src/ir/ir_instr.cc
   src/ir/ir_block.h

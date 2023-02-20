@@ -2,6 +2,8 @@
 #include "codegen/register.h"
 #include "ir/ir_program.h"
 
+#include <fmt/format.h>
+
 std::string_view to_string(Op8086 op) {
   switch (op) {
   case Op8086::INT:
@@ -127,7 +129,7 @@ Op8086 map_opcode(IROp op) {
   default:
     return Op8086::LEA;
   }
-}
+};
 
 bool is_commutative(IROp op) {
   switch (op) {
@@ -158,10 +160,10 @@ CodeGen8086::CodeGen8086(IRProgram *program, const char *out)
     : CodeGen(program, out) {
   using enum RegIdx8086;
   registers_.resize(REG_COUNT_8086);
-  registers_[(int)AX] = std::make_unique<Register>("AX");
-  registers_[(int)BX] = std::make_unique<Register>("BX");
-  registers_[(int)CX] = std::make_unique<Register>("CX");
-  registers_[(int)DX] = std::make_unique<Register>("DX");
+  registers_[(int)AX] = std::make_unique<Register>("AX", 0.5);
+  registers_[(int)BX] = std::make_unique<Register>("BX", 0.0);
+  registers_[(int)CX] = std::make_unique<Register>("CX", 0.0);
+  registers_[(int)DX] = std::make_unique<Register>("DX", 0.25);
   ax = registers_[(int)AX].get();
   bx = registers_[(int)BX].get();
   cx = registers_[(int)CX].get();
@@ -169,7 +171,46 @@ CodeGen8086::CodeGen8086(IRProgram *program, const char *out)
   stack_start_ = 2 * 3; // backing up 3 regisers
 }
 
+void CodeGen8086::debug_print(IRAddress *addr) {
+  out_file_ << ";" << addr->name();
+  if (addr->is_var()) {
+    out_file_ << " (" << effective_offset(addr->var()->offset()) << ")";
+  }
+  out_file_ << ": ";
+  if (!addr->is_dirty()) {
+    out_file_ << "self, ";
+  }
+  for (auto &reg : addr->registers()) {
+    out_file_ << reg->name() << ", ";
+  }
+  out_file_ << std::endl;
+}
+
+void CodeGen8086::debug_print(IRInstr *instr) {
+  for (auto &reg : registers_) {
+    out_file_ << ";" << reg->name() << ": ";
+    for (auto &addr : reg->addresses()) {
+      out_file_ << addr->name() << ", ";
+    }
+    out_file_ << std::endl;
+  }
+  std::set<IRAddress *> curr = instr->srcs();
+  if (auto addr = instr->dest()) {
+    curr.insert(addr);
+  }
+
+  auto t = curr;
+  curr.insert(last_args_.begin(), last_args_.end());
+  last_args_ = std::move(t);
+
+  for (auto &addr : curr) {
+    debug_print(addr);
+  }
+  out_file_ << ";" << *instr << std::endl;
+}
+
 void CodeGen8086::gen_instr(IRInstr *instr) {
+  // debug_print(instr);
   switch (instr->op()) {
   case IROp::PTRST:
   case IROp::PTRLD: {
@@ -271,18 +312,12 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
         reg = Register::min_spill_reg(registers_, instr, nullptr, raddr);
         spill(reg, instr, raddr);
         reg->clear();
+        print_instr(Op8086::MOV, reg->name(), gen_addr(raddr));
+        raddr->add_register(reg);
       }
-      raddr->add_register(reg);
       /* only held by reg now */
       addr->set_dirty(true);
       addr->add_register(reg);
-
-      if (addr->is_var()) {
-        std::cout << "addr: %" << addr->var()->id() << std::endl;
-        for (auto &reg : addr->registers()) {
-          std::cout << "reg: " << reg->name() << std::endl;
-        }
-      }
     }
   } break;
   case IROp::ADD:
@@ -306,7 +341,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       reg->clear();
       print_instr(op, reg->name(), arg2.imd_int());
 
-      if (instr->arg1().is_imd_int() && op == Op8086::SUB) {
+      if (instr->arg2().is_imd_int() && op == Op8086::SUB) {
         // only SUB is not commutative
         print_instr(Op8086::NEG, reg->name());
       }
@@ -494,7 +529,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     break;
   case IROp::JMPIFNOT:
     spill_all(instr);
-    negate(cjmp_op_);
+    cjmp_op_ = negate(cjmp_op_);
     print_instr(cjmp_op_, instr->arg2());
     break;
   case IROp::JMP:
@@ -539,6 +574,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
         reg = Register::min_spill_reg(registers_, instr);
         spill(reg, instr);
         reg->clear();
+        print_instr(Op8086::MOV, reg->name(), gen_addr(raddr2));
         raddr2->add_register(reg);
       }
 
@@ -549,28 +585,37 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       }
     }
   } break;
-  case IROp::PARAM:
+  case IROp::PARAM: {
+    auto block = instr->block();
+    // try to minimise MOV SP, BP instructions within block
+    // at first call remember the offset which was set,
+    // increase it as each param is pushed
+    // use this last known offset to only adjust diff to SP
     if (!call_seq_) {
       call_seq_ = true;
-      print_instr(Op8086::MOV, "SP", "BP");
-      print_instr(Op8086::ADD, "SP",
-                  effective_offset(instr->block()->stack_offset()));
-    }
-    {
-      auto addr = instr->arg1().addr();
-      if (addr->is_var()) {
-        std::cout << "addr: %" << addr->var()->id() << std::endl;
-        for (auto &reg : addr->registers()) {
-          std::cout << "reg: " << reg->name() << std::endl;
-        }
-      }
-      if (addr->is_dirty()) {
-        print_instr(Op8086::PUSH, addr->get_register()->name());
+      if (!block->last_stack_offset()) {
+        print_instr(Op8086::MOV, "SP", "BP");
+        print_instr(Op8086::ADD, "SP", effective_offset(block->stack_offset()));
+        block->set_last_stack_offset(block->stack_offset());
       } else {
-        print_instr(Op8086::PUSH, gen_addr(addr));
+        auto loff = *block->last_stack_offset();
+        auto diff = block->stack_offset() - loff;
+        print_instr(Op8086::ADD, "SP", diff * 2);
+        block->set_last_stack_offset(block->stack_offset());
       }
     }
-    break;
+
+    assert(block->last_stack_offset());
+    auto off = *block->last_stack_offset() + 1;
+    block->set_last_stack_offset(off);
+
+    auto addr = instr->arg1().addr();
+    if (addr->is_dirty()) {
+      print_instr(Op8086::PUSH, addr->get_register()->name());
+    } else {
+      print_instr(Op8086::PUSH, gen_addr(addr));
+    }
+  } break;
   case IROp::CALL:
     call_seq_ = false;
     // AX is reserved for WORD return
@@ -753,8 +798,7 @@ void CodeGen8086::gen_global(IRGlobal *global) {
             << std::endl;
 }
 
-constexpr const char *built_in = R"(
-println PROC             
+constexpr const char *built_in = R"(println PROC             
     PUSH BP
     PUSH BX
     PUSH CX            
@@ -797,15 +841,17 @@ LOOP_PRINT:
     POP BX
     POP BP
     RET
-println ENDP
-)";
+println ENDP)";
 
 void CodeGen8086::gen() {
   out_file_ << ".MODEL SMALL" << std::endl
             << ".STACK 1000H" << std::endl
             << ".DATA" << std::endl;
   for (auto &[_, global] : program_->globals()) {
-    gen_global(global.get());
+    if (global->size()) {
+      gen_global(global.get());
+    }
+    std::cout << global->name() << ": " << global->size() << std::endl;
   }
   out_file_ << ".CODE" << std::endl;
   for (auto &proc : program_->procs()) {

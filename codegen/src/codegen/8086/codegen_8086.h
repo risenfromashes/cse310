@@ -73,6 +73,8 @@ public:
   void gen();
 
 private:
+  void debug_print(IRAddress *addr);
+  void debug_print(IRInstr *instr);
   // loads addr into register (doesn't clear reg)
   Register *spill_and_load(IRAddress *addr, IRInstr *instr,
                            IRAddress *spill_except, Register *skip = nullptr);
@@ -84,4 +86,6 @@ private:
   Op8086 cjmp_op_;
 
   int stack_start_;
+
+  std::set<IRAddress *> last_args_;
 };

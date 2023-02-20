@@ -40,6 +40,9 @@ public:
   IRProc *proc() { return proc_; }
   int index() { return idx_; }
 
+  std::optional<int> last_stack_offset() { return last_stack_offset_; }
+  void set_last_stack_offset(int offset) { last_stack_offset_ = offset; }
+
 private:
   IRLabel *label_;
   /* successors and predecessors in flow graph */
@@ -56,10 +59,9 @@ private:
 
   std::vector<IRInstr> instrs_;
   bool sealed_ = false;
-
   int idx_;
-
   int stack_offset_;
-
   IRProc *proc_;
+
+  std::optional<int> last_stack_offset_;
 };
