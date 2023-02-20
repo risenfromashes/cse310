@@ -194,6 +194,13 @@ void IRGenerator::visit_func_decl(FuncDecl *func_decl) {
       // implicit return
       print_ir_instr(IROp::RET, n);
     }
+
+    if (func_decl->name() == "main" &&
+        !dynamic_cast<ReturnStmt *>(last.get())) {
+      // implicit return
+      print_ir_instr(IROp::RET, n);
+    }
+
     print_ir_instr(IROp::ENDP, name, n);
   }
 }
@@ -250,7 +257,12 @@ void IRGenerator::visit_var_decl(VarDecl *var_decl) {
     current_var_ = name;
   } else {
     int v = current_temp_;
-    print_ir_instr(IROp::ALLOC, new_temp(), n);
+    if (var_decl->type()->is_sized_array()) {
+      auto t = dynamic_cast<SizedArrayType *>(var_decl->type());
+      print_ir_instr(IROp::AALLOC, new_temp(), t->array_size(), n);
+    } else {
+      print_ir_instr(IROp::ALLOC, new_temp(), n);
+    }
     var_decl->ir_var(v);
   }
 }
@@ -732,6 +744,7 @@ std::string IRGenerator::new_label() {
 void IRGenerator::print_tab(IROp op) {
   switch (op) {
   case IROp::PROC:
+  case IROp::ENDP:
   case IROp::GLOBAL:
     break;
   default:
@@ -740,7 +753,7 @@ void IRGenerator::print_tab(IROp op) {
 }
 
 void IRGenerator::print_src_loc(ASTNode *node) {
-  out_file_ << "\t\t; line #" << node->location().start_line() << std::endl;
+  out_file_ << ";#" << node->location().start_line() << std::endl;
 }
 
 void IRGenerator::print_ir_instr(IROp op, ASTNode *n) {

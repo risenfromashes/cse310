@@ -47,7 +47,7 @@ bool is_commutative(IROp op);
 
 class CodeGen8086 : public CodeGen {
 public:
-  CodeGen8086(IRProgram *program, const char *out);
+  CodeGen8086(IRProgram *program, const char *out, bool verbose = false);
 
   void gen_proc(IRProc *proc) override;
   void gen_block(IRBlock *block) override;
@@ -88,4 +88,5 @@ private:
   int stack_start_;
 
   std::set<IRAddress *> last_args_;
+  bool verbose_ = false;
 };

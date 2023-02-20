@@ -35,7 +35,10 @@ int main(int argc, char **argv) {
     context.parse();
     context.print_ast();
     context.print_pt();
-    IRGenerator ir_gen("ir.txt");
+
+    auto out = std::string(base_name(in_file)) + ".ir";
+
+    IRGenerator ir_gen(out.c_str());
     ir_gen.generate(context.ast_root());
   } else {
     fmt::print(stderr, "Couldn't access input file: {}", in_file);

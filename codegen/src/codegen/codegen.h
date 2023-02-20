@@ -22,12 +22,14 @@ protected:
   void print_instr(auto op, auto &&a1, auto &&a2);
   void print_instr(auto op, auto &&a1, auto &&a2, auto &&a3);
   void print_label(std::string_view label);
+  void print_src_line(IRInstr *instr);
 
   IRProgram *program_;
   std::ofstream out_file_;
 
   bool dry_run_ = false;
   bool stack_accessed_ = false;
+  int last_src_line_ = 0;
 };
 
 void CodeGen::print_instr(auto op) {

@@ -77,3 +77,17 @@ std::string unescape_unquote(std::string_view str) {
   };
   return ret;
 }
+
+std::string_view base_name(std::string_view filename) {
+  size_t start = 0;
+  size_t end = filename.size() - 1;
+  for (size_t i = 0; i < filename.size(); i++) {
+    if (filename[i] == '/') {
+      start = i + 1;
+    }
+    if (filename[i] == '.' && i > start) {
+      end = i;
+    }
+  }
+  return filename.substr(start, end - start);
+}

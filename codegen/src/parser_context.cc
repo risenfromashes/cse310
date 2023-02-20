@@ -53,11 +53,6 @@ Token *ParserContext::new_token(int lineno, const char *text,
 }
 
 void ParserContext::enter_scope() {
-  std::cout << "entering scope" << std::endl;
-  std::cout << "has current params: " << (bool)current_params_ << std::endl;
-  if (current_params_) {
-    std::cout << "n param: " << current_params_->size() << std::endl;
-  }
   table_.enter_scope();
   if (current_params()) {
     for (auto &param : *current_params()) {

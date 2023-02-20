@@ -35,6 +35,8 @@ add_executable(frontend
   src/frontend.cc
   ${BISON_parser_OUTPUTS}
   ${FLEX_scanner_OUTPUTS}
+  src/parse_utils.h
+  src/parse_utils.cc
   src/parser_context.h
   src/parser_context.cc
   src/token.h
@@ -83,6 +85,8 @@ add_backward(frontend)
 add_executable(backend8086
   src/backend8086.cc
   ${FLEX_ir_scanner_OUTPUTS}
+  src/parse_utils.h
+  src/parse_utils.cc
   src/ir/ir_address.h
   src/ir/ir_address.cc
   src/ir/ir_instr.h
@@ -115,3 +119,9 @@ target_include_directories(backend8086 PRIVATE src/ ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(frontend PRIVATE fmt::fmt)
 target_link_libraries(backend8086 PRIVATE fmt::fmt)
 
+
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/acc
+"#!/bin/bash
+./frontend -i \"$1\"
+./backend8086 -i $(basename \"$1\" .c).ir $2
+")

@@ -40,3 +40,5 @@ auto expect_params_impl(std::string_view &line, bool matched_before) {
 std::string unescape_unquote(std::string_view str);
 
 template <class T> T from_string(std::string_view str) { return T{}; }
+
+std::string_view base_name(std::string_view filename);

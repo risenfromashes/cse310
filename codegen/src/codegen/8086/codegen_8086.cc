@@ -156,8 +156,8 @@ bool is_div(IROp op) {
   }
 }
 
-CodeGen8086::CodeGen8086(IRProgram *program, const char *out)
-    : CodeGen(program, out) {
+CodeGen8086::CodeGen8086(IRProgram *program, const char *out, bool verbose)
+    : CodeGen(program, out), verbose_(verbose) {
   using enum RegIdx8086;
   registers_.resize(REG_COUNT_8086);
   registers_[(int)AX] = std::make_unique<Register>("AX", 0.5);
@@ -211,6 +211,9 @@ void CodeGen8086::debug_print(IRInstr *instr) {
 
 void CodeGen8086::gen_instr(IRInstr *instr) {
   // debug_print(instr);
+  if (verbose_) {
+    print_src_line(instr);
+  }
   switch (instr->op()) {
   case IROp::PTRST:
   case IROp::PTRLD: {
@@ -220,7 +223,8 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       // load index in DI
       if (instr->arg3().is_imd_int()) {
         auto off = instr->arg3().imd_int();
-        print_instr(Op8086::MOV, "DI", off);
+        asm_addr = "WORD PTR " + std::string(global->name()) + "[" +
+                   std::to_string(off * 2) + "]";
       } else {
         auto addr = instr->arg3().addr();
         if (addr->is_dirty()) {
@@ -228,8 +232,9 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
         } else {
           print_instr(Op8086::MOV, "DI", gen_addr(addr));
         }
+        print_instr(Op8086::SAL, "DI", 1);
+        asm_addr = "WORD PTR " + std::string(global->name()) + "[DI]";
       }
-      asm_addr = std::string(global->name()) + "[2*DI]";
     } else {
       auto var = instr->arg2().var();
       if (instr->arg3().is_imd_int()) {
@@ -243,12 +248,12 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
           print_instr(Op8086::MOV, "SI", gen_addr(addr));
         }
         // since we are using words
-        print_instr(Op8086::SAL, "SI", 2);
+        print_instr(Op8086::SAL, "SI", 1);
         asm_addr = gen_stack_addr(var->offset(), true);
       }
     }
-    auto addr = instr->arg1().addr();
     if (instr->op() == IROp::PTRLD) {
+      auto addr = instr->arg1().addr();
       /* spill everything except addr in a register */
       Register *reg = Register::min_spill_reg(registers_, instr, nullptr, addr);
       spill(reg, instr, addr);
@@ -259,22 +264,27 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       addr->clear_registers();
       addr->add_register(reg);
     } else {
-      Register *reg;
-      if (addr->reg_count()) {
-        reg = addr->get_register();
+      if (instr->arg1().is_imd_int()) {
+        print_instr(Op8086::MOV, asm_addr, instr->arg1().imd_int());
       } else {
-        /* no register holds this addr */
-        assert(!addr->is_dirty());
+        IRAddress *addr = instr->arg1().addr();
+        Register *reg;
+        if (addr->reg_count()) {
+          reg = addr->get_register();
+        } else {
+          /* no register holds this addr */
+          assert(!addr->is_dirty());
 
-        Register *reg = Register::min_spill_reg(registers_, instr);
-        spill(reg, instr);
-        reg->clear();
+          Register *reg = Register::min_spill_reg(registers_, instr);
+          spill(reg, instr);
+          reg->clear();
 
-        print_instr(Op8086::MOV, reg->name(), gen_addr(addr));
-        addr->add_register(reg);
+          print_instr(Op8086::MOV, reg->name(), gen_addr(addr));
+          addr->add_register(reg);
+        }
+
+        print_instr(Op8086::MOV, asm_addr, reg->name());
       }
-
-      print_instr(Op8086::MOV, asm_addr, reg->name());
     }
 
   } break;
@@ -875,14 +885,14 @@ LOOP_PRINT:
 println ENDP)";
 
 void CodeGen8086::gen() {
-  out_file_ << ".MODEL SMALL" << std::endl
-            << ".STACK 1000H" << std::endl
-            << ".DATA" << std::endl;
-  for (auto &[_, global] : program_->globals()) {
-    if (global->size()) {
-      gen_global(global.get());
+  out_file_ << ".MODEL SMALL" << std::endl << ".STACK 1000H" << std::endl;
+  if (!program_->globals().empty()) {
+    out_file_ << ".DATA" << std::endl;
+    for (auto &[_, global] : program_->globals()) {
+      if (global->size()) {
+        gen_global(global.get());
+      }
     }
-    std::cout << global->name() << ": " << global->size() << std::endl;
   }
   out_file_ << ".CODE" << std::endl;
   for (auto &proc : program_->procs()) {

@@ -24,6 +24,8 @@ crlf (\r)?\n
 %%
 
 {ws}             { }
+";#"{num}{crlf}  { yyextra->source_line(std::atoi(yytext + 2)); 
+                   yyextra->new_line();                          }
 ";".*{crlf}      { yyextra->new_line();                          }
 ":".*{crlf}      { yyextra->new_line();                          }
 

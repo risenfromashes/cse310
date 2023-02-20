@@ -102,6 +102,7 @@ void IRParser::end_proc() {
 }
 
 void IRParser::add_instr(IRInstr instr) {
+  instr.set_source_line(current_source_line_);
   assert(current_proc_);
   current_proc_->add_instr(std::move(instr));
 }

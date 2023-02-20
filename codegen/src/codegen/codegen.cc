@@ -8,3 +8,12 @@ void CodeGen::print_label(std::string_view label) {
     out_file_ << label << ": " << std::endl;
   }
 }
+
+void CodeGen::print_src_line(IRInstr *instr) {
+  if (!dry_run_) {
+    if (last_src_line_ != instr->source_line()) {
+      last_src_line_ = instr->source_line();
+      out_file_ << "; line #" << last_src_line_ << std::endl;
+    }
+  }
+}

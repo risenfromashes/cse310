@@ -144,6 +144,9 @@ public:
 
   friend std::ostream &operator<<(std::ostream &os, const IRInstr &instr);
 
+  void set_source_line(int line) { source_line_ = line; }
+  int source_line() { return source_line_; }
+
 private:
   std::set<IRAddress *> find_srcs();
   IRAddress *find_dest();
@@ -161,4 +164,5 @@ private:
   IRAddress *dest_var_;
 
   IRBlock *block_;
+  int source_line_ = 0;
 };

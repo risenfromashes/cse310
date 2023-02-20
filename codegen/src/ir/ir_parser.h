@@ -34,6 +34,9 @@ public:
 
   void parse();
 
+  void source_line(int line) { current_source_line_ = line; }
+  int souce_line() { return current_source_line_; }
+
 private:
   void *scanner_;
 
@@ -44,4 +47,6 @@ private:
   std::optional<IRLabel *> last_label_;
 
   FILE *in_file_;
+
+  int current_source_line_ = 0;
 };
