@@ -28,8 +28,17 @@ IRVar *IRParser::get_var(int id) {
 }
 
 IRGlobal *IRParser::get_global(std::string name) {
+  static int id = 0;
+  static std::set<std::string> built_ins = {"main", "println"};
   if (!program_.globals_.contains(name)) {
-    program_.globals_.emplace(name, std::make_unique<IRGlobal>(name));
+    if (!built_ins.contains(name)) {
+      auto new_name = name + std::to_string(id);
+      program_.globals_.emplace(name, std::make_unique<IRGlobal>(new_name));
+    } else {
+      // don't do anything for built-in func
+      program_.globals_.emplace(name, std::make_unique<IRGlobal>(name));
+    }
+    id++;
   }
   return program_.globals_.at(name).get();
 }
