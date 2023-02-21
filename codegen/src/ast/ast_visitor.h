@@ -11,6 +11,8 @@ class IfStmt;
 class WhileStmt;
 class ForStmt;
 class ReturnStmt;
+class BreakStmt;
+class ContinueStmt;
 
 class FuncDecl;
 class ParamDecl;
@@ -41,6 +43,8 @@ public:
   virtual void visit_while_stmt(WhileStmt *while_stmt) = 0;
   virtual void visit_for_stmt(ForStmt *for_stmt) = 0;
   virtual void visit_return_stmt(ReturnStmt *return_stmt) = 0;
+  virtual void visit_break_stmt(BreakStmt *return_stmt) = 0;
+  virtual void visit_continue_stmt(ContinueStmt *return_stmt) = 0;
 
   virtual void visit_func_decl(FuncDecl *func_decl) = 0;
   virtual void visit_param_decl(ParamDecl *param_decl) = 0;

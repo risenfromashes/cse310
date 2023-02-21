@@ -51,6 +51,8 @@ public:
   void visit_while_stmt(WhileStmt *while_stmt) override;
   void visit_for_stmt(ForStmt *for_stmt) override;
   void visit_return_stmt(ReturnStmt *return_stmt) override;
+  void visit_break_stmt(BreakStmt *break_stmt) override;
+  void visit_continue_stmt(ContinueStmt *continue_stmt) override;
 
   void visit_func_decl(FuncDecl *func_decl) override;
   void visit_param_decl(ParamDecl *param_decl) override;
@@ -108,6 +110,9 @@ private:
   std::ofstream out_file_;
 
   std::stack<IRGenContext> context_stack_;
+
+  std::optional<std::string> continue_label_;
+  std::optional<std::string> exit_label_;
 };
 
 void IRGenerator::print_ir_instr(IROp op, auto &&a1, ASTNode *n) {

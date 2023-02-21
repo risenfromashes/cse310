@@ -156,8 +156,9 @@ bool is_div(IROp op) {
   }
 }
 
-CodeGen8086::CodeGen8086(IRProgram *program, const char *out, bool verbose)
-    : CodeGen(program, out), verbose_(verbose) {
+CodeGen8086::CodeGen8086(IRProgram *program, const char *out, bool verbose,
+                         bool debug)
+    : CodeGen(program, out), verbose_(verbose), debug_(debug) {
   using enum RegIdx8086;
   registers_.resize(REG_COUNT_8086);
   registers_[(int)AX] = std::make_unique<Register>("AX", 0.5);
@@ -187,30 +188,32 @@ void CodeGen8086::debug_print(IRAddress *addr) {
 }
 
 void CodeGen8086::debug_print(IRInstr *instr) {
-  for (auto &reg : registers_) {
-    out_file_ << ";" << reg->name() << ": ";
-    for (auto &addr : reg->addresses()) {
-      out_file_ << addr->name() << ", ";
+  if (!dry_run_ && debug_) {
+    for (auto &reg : registers_) {
+      out_file_ << ";" << reg->name() << ": ";
+      for (auto &addr : reg->addresses()) {
+        out_file_ << addr->name() << ", ";
+      }
+      out_file_ << std::endl;
     }
-    out_file_ << std::endl;
-  }
-  std::set<IRAddress *> curr = instr->srcs();
-  if (auto addr = instr->dest()) {
-    curr.insert(addr);
-  }
+    std::set<IRAddress *> curr = instr->srcs();
+    if (auto addr = instr->dest()) {
+      curr.insert(addr);
+    }
 
-  auto t = curr;
-  curr.insert(last_args_.begin(), last_args_.end());
-  last_args_ = std::move(t);
+    auto t = curr;
+    curr.insert(last_args_.begin(), last_args_.end());
+    last_args_ = std::move(t);
 
-  for (auto &addr : curr) {
-    debug_print(addr);
+    for (auto &addr : curr) {
+      debug_print(addr);
+    }
+    out_file_ << ";" << *instr << std::endl;
   }
-  out_file_ << ";" << *instr << std::endl;
 }
 
 void CodeGen8086::gen_instr(IRInstr *instr) {
-  // debug_print(instr);
+  debug_print(instr);
   if (verbose_) {
     print_src_line(instr);
   }
@@ -435,8 +438,14 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       // load into register
       Register *reg =
           Register::min_spill_reg(registers_, instr, cx, addr, raddr);
-
       bool contained = raddr && reg->contains(raddr);
+
+      if (reg->contains(saddr) && !cx->contains(saddr)) {
+        // since reg will be spilled need to save value of saddr
+        spill(cx, instr);
+        print_instr(Op8086::MOV, "CX", reg->name());
+        cx->add_address(saddr);
+      }
       spill(reg, instr, addr);
 
       if (raddr) {
@@ -453,16 +462,16 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       }
       reg->clear();
 
-      spill(cx, instr);
+      spill(cx, instr, saddr);
       if (!cx->contains(saddr)) {
         if (!saddr->is_dirty()) {
-          print_instr(Op8086::MOV, reg->name(), gen_addr(saddr));
+          print_instr(Op8086::MOV, "CX", gen_addr(saddr));
         } else {
-          print_instr(Op8086::MOV, reg->name(), saddr->get_register()->name());
+          print_instr(Op8086::MOV, "CX", saddr->get_register()->name());
         }
+        cx->clear();
         saddr->add_register(cx);
       }
-      cx->clear();
 
       print_instr(op, reg->name(), "CL");
       addr->set_dirty(true);
@@ -477,13 +486,18 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     auto addr = instr->arg1().addr();
     auto arg1 = instr->arg2();
     auto arg2 = instr->arg3();
+    IRAddress *raddr2 = nullptr;
+    if (arg2.is_addr()) {
+      raddr2 = arg2.addr();
+    }
 
     // but both cannot be immediate
     if (arg1.is_imd_int()) {
-      std::swap(arg1, arg2);
+      if (!is_div(instr->op())) {
+        std::swap(arg1, arg2);
+      }
     }
 
-    auto raddr1 = arg1.addr();
     // dx must be spilled
     spill(dx, instr, addr);
     dx->clear();
@@ -491,21 +505,32 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       // zero higher order bits
       print_instr(Op8086::XOR, "DX", "DX");
     }
+
     // operand1 must be in AX
-    bool contained = ax->contains(raddr1);
-    spill(ax, instr, addr);
-    if (!contained) {
-      if (!raddr1->is_dirty()) {
-        print_instr(Op8086::MOV, ax->name(), gen_addr(raddr1));
-      } else {
-        print_instr(Op8086::MOV, ax->name(), raddr1->get_register()->name());
+    if (arg1.is_imd_int()) {
+      spill(ax, instr, addr, raddr2);
+      print_instr(Op8086::MOV, ax->name(), arg1.imd_int());
+    } else {
+      auto raddr1 = arg1.addr();
+      bool contained = ax->contains(raddr1);
+      spill(ax, instr, addr, raddr2);
+
+      if (!contained) {
+        if (!raddr1->is_dirty()) {
+          print_instr(Op8086::MOV, ax->name(), gen_addr(raddr1));
+        } else {
+          print_instr(Op8086::MOV, ax->name(), raddr1->get_register()->name());
+        }
       }
     }
+    ax->clear();
+
     // operand2 must be in register or memory
     Register *reg = nullptr;
     if (arg2.is_imd_int()) {
       // then just load to some register
       reg = Register::min_spill_reg({bx, cx}, instr);
+      spill(reg, instr, addr);
       print_instr(Op8086::MOV, reg->name(), arg2.imd_int());
     } else if (arg2.addr()->reg_count()) {
       reg = arg2.addr()->get_register();
@@ -583,7 +608,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
         reg = raddr2->get_register();
       } else {
         reg = Register::min_spill_reg(registers_, instr);
-        spill(reg, instr);
+        spill(reg, instr, nullptr, raddr1);
         reg->clear();
         print_instr(Op8086::MOV, reg->name(), gen_addr(raddr2));
         raddr2->add_register(reg);
@@ -702,6 +727,7 @@ void CodeGen8086::gen_proc(IRProc *proc) {
   if (proc->name() == "main") {
     print_instr(Op8086::MOV, "AX", "@DATA");
     print_instr(Op8086::MOV, "DS", "AX");
+    print_instr(Op8086::MOV, "BP", "SP");
   } else {
     // dry run to find which registers are used
     // and if the stack is ever used
@@ -774,16 +800,46 @@ void CodeGen8086::load(Register *reg, int offset) {
   print_instr(Op8086::MOV, reg->name(), gen_stack_addr(offset));
 }
 
-void CodeGen8086::spill(Register *reg, IRInstr *instr, IRAddress *except) {
-  for (auto &addr : reg->addresses()) {
-    if (addr != except && instr->next_use().contains(addr)) {
-      /* no use saving information which is never used again */
-      if (addr->is_dirty() && addr->reg_count() == 1) {
-        /* only store value if value is not up to date  and not saved anywhere*/
-        store(reg, addr);
+void CodeGen8086::spill(Register *reg, IRInstr *instr, IRAddress *except,
+                        IRAddress *preserve) {
+  if (preserve && preserve != except) {
+    if (reg->contains(preserve)) {
+      if (preserve->held_only_at(reg)) {
+        if (!instr->next_use().contains(preserve)) {
+          store(reg, preserve);
+        }
       }
     }
-    addr->remove_register(reg);
+  }
+  for (auto &addr : reg->addresses()) {
+    if (addr != except) {
+      if (instr->next_use().contains(addr)) {
+        /* no use saving information which is never used again */
+        if (addr->is_dirty() && addr->reg_count() == 1) {
+          /* only store value if value is not up to date  and not saved
+           * anywhere*/
+          store(reg, addr);
+        }
+      }
+      addr->remove_register(reg);
+    }
+  }
+}
+
+void CodeGen8086::spill(Register *reg, IRInstr *instr,
+                        std::set<IRAddress *> except) {
+  for (auto &addr : reg->addresses()) {
+    if (!except.contains(addr)) {
+      if (instr->next_use().contains(addr)) {
+        /* no use saving information which is never used again */
+        if (addr->is_dirty() && addr->reg_count() == 1) {
+          /* only store value if value is not up to date  and not saved
+           * anywhere*/
+          store(reg, addr);
+        }
+      }
+      addr->remove_register(reg);
+    }
   }
 }
 

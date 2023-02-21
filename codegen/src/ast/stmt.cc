@@ -111,3 +111,14 @@ std::unique_ptr<Stmt> ReturnStmt::create(ParserContext *context, Location loc,
   auto expr = _expr.release();
   return std::unique_ptr<Stmt>(new ReturnStmt(loc, expr));
 }
+
+BreakStmt::BreakStmt(Location loc) : Stmt(loc) {}
+std::unique_ptr<Stmt> BreakStmt::create(ParserContext *context, Location loc) {
+  return std::unique_ptr<Stmt>(new BreakStmt(loc));
+}
+
+ContinueStmt::ContinueStmt(Location loc) : Stmt(loc) {}
+std::unique_ptr<Stmt> ContinueStmt::create(ParserContext *context,
+                                           Location loc) {
+  return std::unique_ptr<Stmt>(new ContinueStmt(loc));
+}

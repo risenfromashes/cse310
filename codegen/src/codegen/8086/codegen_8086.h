@@ -47,7 +47,8 @@ bool is_commutative(IROp op);
 
 class CodeGen8086 : public CodeGen {
 public:
-  CodeGen8086(IRProgram *program, const char *out, bool verbose = false);
+  CodeGen8086(IRProgram *program, const char *out, bool verbose = false,
+              bool debug = false);
 
   void gen_proc(IRProc *proc) override;
   void gen_block(IRBlock *block) override;
@@ -67,7 +68,16 @@ public:
 
   int effective_offset(int offset);
 
-  void spill(Register *reg, IRInstr *instr, IRAddress *except = nullptr);
+  /*** the third parameter is the trickiest ***/
+  /* in a very special case, it can be that we need an address for an operation
+   * and it might just so happen that it was held only at this register (reg),
+   * but it is not used after that ir instruction.
+   * as a result, the address has no next-use and hence it wouldn't be spilled
+   * but we need it somewhere!
+   * preserve - the third parameter is to pass possibly such an address */
+  void spill(Register *reg, IRInstr *instr, IRAddress *except = nullptr,
+             IRAddress *preserve = nullptr);
+  void spill(Register *reg, IRInstr *instr, std::set<IRAddress *> except);
   void spill_all(IRInstr *instr);
 
   void gen();
@@ -89,4 +99,5 @@ private:
 
   std::set<IRAddress *> last_args_;
   bool verbose_ = false;
+  bool debug_ = false;
 };

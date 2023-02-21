@@ -145,3 +145,21 @@ public:
 private:
   std::unique_ptr<Expr> expr_;
 };
+
+class BreakStmt : public Stmt {
+public:
+  BreakStmt(Location loc);
+  static std::unique_ptr<Stmt> create(ParserContext *context, Location loc);
+
+  void visit(ASTVisitor *visitor) override { visitor->visit_break_stmt(this); }
+};
+
+class ContinueStmt : public Stmt {
+public:
+  ContinueStmt(Location loc);
+  static std::unique_ptr<Stmt> create(ParserContext *context, Location loc);
+
+  void visit(ASTVisitor *visitor) override {
+    visitor->visit_continue_stmt(this);
+  }
+};

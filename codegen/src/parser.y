@@ -328,7 +328,15 @@ statement : var_declaration {
           $$ = NonTerminal::create(context, @$, "statement", $1, $2, $3);
           $$->ast = ReturnStmt::create(context, @$, std::move($2->expr()));
     }
-	  ;
+	  | BREAK SEMICOLON {
+          $$ = NonTerminal::create(context, @$, "statement", $1, $2);
+          $$->ast = BreakStmt::create(context, @$);
+    }
+	  | CONTINUE SEMICOLON {
+          $$ = NonTerminal::create(context, @$, "statement", $1, $2);
+          $$->ast = ContinueStmt::create(context, @$);
+    }
+	;
 	  
 expression_statement 	: expression SEMICOLON {
           $$ = NonTerminal::create(context, @$, "expression_statement", $1, $2);

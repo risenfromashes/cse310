@@ -139,7 +139,8 @@ void IRGenerator::visit_while_stmt(WhileStmt *while_stmt) {
   auto n = while_stmt;
   auto begin = new_label();
   auto exit = new_label();
-
+  continue_label_ = begin;
+  exit_label_ = exit;
   print_ir_label(begin);
   true_label_ = nullopt;
   false_label_ = exit;
@@ -154,6 +155,9 @@ void IRGenerator::visit_for_stmt(ForStmt *for_stmt) {
   auto n = for_stmt;
   auto begin = new_label();
   auto exit = new_label();
+  auto cont = new_label();
+  continue_label_ = cont;
+  exit_label_ = exit;
   for_stmt->init_expr()->visit(this);
   print_ir_label(begin);
   true_label_ = nullopt;
@@ -162,6 +166,7 @@ void IRGenerator::visit_for_stmt(ForStmt *for_stmt) {
   for_stmt->loop_condition()->expr()->visit(this);
   for_stmt->body()->visit(this);
   jump_ = false;
+  print_ir_label(cont);
   for_stmt->iteration_expr()->visit(this);
   print_ir_instr(IROp::JMP, begin, n);
   print_ir_label(exit);
@@ -176,6 +181,18 @@ void IRGenerator::visit_return_stmt(ReturnStmt *return_stmt) {
   } else {
     print_ir_instr(IROp::RET, n);
   }
+}
+
+void IRGenerator::visit_break_stmt(BreakStmt *break_stmt) {
+  auto n = break_stmt;
+  assert(exit_label_);
+  print_ir_instr(IROp::JMP, *exit_label_, n);
+}
+
+void IRGenerator::visit_continue_stmt(ContinueStmt *continue_smt) {
+  auto n = continue_smt;
+  assert(continue_label_);
+  print_ir_instr(IROp::JMP, *continue_label_, n);
 }
 
 void IRGenerator::visit_func_decl(FuncDecl *func_decl) {
@@ -225,6 +242,7 @@ void IRGenerator::visit_ref_expr(RefExpr *ref_expr) {
 
 void IRGenerator::visit_call_expr(CallExpr *call_expr) {
   auto n = call_expr;
+  bool j0 = jump_;
   std::vector<std::string> args;
   for (auto &arg : call_expr->arguments()) {
     jump_ = false;
@@ -241,6 +259,9 @@ void IRGenerator::visit_call_expr(CallExpr *call_expr) {
   } else {
     auto func = current_var_;
     print_ir_instr(IROp::CALL, func, new_temp(), n);
+    if (j0) {
+      gen_expr_jump(n);
+    }
   }
 }
 

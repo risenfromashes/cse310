@@ -88,6 +88,22 @@ void ASTPrinter::visit_return_stmt(ReturnStmt *return_stmt) {
   exit();
 }
 
+void ASTPrinter::visit_break_stmt(BreakStmt *break_stmt) {
+  enter();
+  logger_->write("BreakStmt ");
+  log_location(break_stmt);
+  logger_->endl();
+  exit();
+}
+
+void ASTPrinter::visit_continue_stmt(ContinueStmt *continue_stmt) {
+  enter();
+  logger_->write("ContinueStmt ");
+  log_location(continue_stmt);
+  logger_->endl();
+  exit();
+}
+
 void ASTPrinter::visit_func_decl(FuncDecl *func_decl) {
   enter();
   logger_->write("FunctionDecl ");

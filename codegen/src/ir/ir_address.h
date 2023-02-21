@@ -33,6 +33,9 @@ public:
   Register *get_register();
 
   bool held_at(Register *reg) { return registers_.contains(reg); }
+  bool held_only_at(Register *reg) {
+    return is_dirty() && registers_.size() == 1 && held_at(reg);
+  }
   int reg_count() { return registers_.size(); }
   const std::set<Register *> &registers() { return registers_; }
 
