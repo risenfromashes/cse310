@@ -14,6 +14,7 @@ enum class Op8086 {
   AND,
   OR,
   XOR,
+  CWD,
   INC,
   DEC,
   NOT,

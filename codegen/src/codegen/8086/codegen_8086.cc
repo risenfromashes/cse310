@@ -22,6 +22,8 @@ std::string_view to_string(Op8086 op) {
     return "IMUL";
   case Op8086::IDIV:
     return "IDIV";
+  case Op8086::CWD:
+    return "CWD";
   case Op8086::LEA:
     return "LEA";
   case Op8086::PUSH:
@@ -506,7 +508,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     dx->clear();
     if (is_div(instr->op())) {
       // zero higher order bits
-      print_instr(Op8086::XOR, "DX", "DX");
+      print_instr(Op8086::CWD);
     }
 
     // operand1 must be in AX
