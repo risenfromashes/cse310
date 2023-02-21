@@ -41,6 +41,11 @@ public:
 
   std::string_view name() { return name_; }
 
+  void reset() {
+    clear_registers();
+    dirty_ = false;
+  }
+
 protected:
   IRAddressType type_;
   bool is_const_;

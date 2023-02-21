@@ -1,4 +1,5 @@
 #include "codegen.h"
+#include "ir/ir_address.h"
 
 CodeGen::CodeGen(IRProgram *program, const char *out)
     : program_(program), out_file_(out) {}
@@ -15,5 +16,11 @@ void CodeGen::print_src_line(IRInstr *instr) {
       last_src_line_ = instr->source_line();
       out_file_ << "; line #" << last_src_line_ << std::endl;
     }
+  }
+}
+
+void CodeGen::reset_globals() {
+  for (auto &[_, var] : program_->globals()) {
+    var->reset();
   }
 }

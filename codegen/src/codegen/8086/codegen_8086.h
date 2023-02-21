@@ -83,6 +83,7 @@ public:
   void gen();
 
 private:
+  void reset_registers(bool clear_access = true);
   void debug_print(IRAddress *addr);
   void debug_print(IRInstr *instr);
   // loads addr into register (doesn't clear reg)

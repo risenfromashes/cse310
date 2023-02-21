@@ -17,6 +17,7 @@ public:
   virtual ~CodeGen() = default;
 
 protected:
+  void reset_globals();
   void print_instr(auto op);
   void print_instr(auto op, auto &&a1);
   void print_instr(auto op, auto &&a1, auto &&a2);

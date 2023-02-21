@@ -712,7 +712,7 @@ void IRGenerator::visit_array_subscript_expr(ArraySubscriptExpr *arr) {
   auto cnst = arr->subscript()->const_eval();
   if (cnst) {
     arr->array()->visit(this);
-    auto &arg = current_var_;
+    auto arg = current_var_;
     print_ir_instr(IROp::PTRLD, new_temp(), arg, *cnst, n);
   } else {
     arr->array()->visit(this);

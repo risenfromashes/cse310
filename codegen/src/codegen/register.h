@@ -43,7 +43,12 @@ public:
     return contains(addr) && (addr_count() == 1);
   }
 
-  void reset() { accessed_ = false; }
+  void reset(bool clear_access = true) {
+    if (clear_access) {
+      accessed_ = false;
+    }
+    clear();
+  }
   bool accessed() { return accessed_; }
 
 private:

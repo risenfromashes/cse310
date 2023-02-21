@@ -123,5 +123,5 @@ target_link_libraries(backend8086 PRIVATE fmt::fmt)
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/acc
 "#!/bin/bash
 ./frontend -i \"$1\"
-./backend8086 -i $(basename \"$1\" .c).ir $2
+./backend8086 -i $(basename \"$1\" .c).ir $2 $3
 ")

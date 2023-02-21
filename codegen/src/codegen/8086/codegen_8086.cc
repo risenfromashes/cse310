@@ -188,7 +188,7 @@ void CodeGen8086::debug_print(IRAddress *addr) {
 }
 
 void CodeGen8086::debug_print(IRInstr *instr) {
-  if (!dry_run_ && debug_) {
+  if (debug_) {
     for (auto &reg : registers_) {
       out_file_ << ";" << reg->name() << ": ";
       for (auto &addr : reg->addresses()) {
@@ -207,6 +207,9 @@ void CodeGen8086::debug_print(IRInstr *instr) {
 
     for (auto &addr : curr) {
       debug_print(addr);
+    }
+    for (auto &[_, global] : program_->globals()) {
+      debug_print(global.get());
     }
     out_file_ << ";" << *instr << std::endl;
   }
@@ -242,7 +245,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
       auto var = instr->arg2().var();
       if (instr->arg3().is_imd_int()) {
         auto off = instr->arg3().imd_int();
-        asm_addr = gen_stack_addr(off);
+        asm_addr = gen_stack_addr(var->offset() - off);
       } else {
         auto addr = instr->arg3().addr();
         if (addr->is_dirty()) {
@@ -278,7 +281,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
           /* no register holds this addr */
           assert(!addr->is_dirty());
 
-          Register *reg = Register::min_spill_reg(registers_, instr);
+          reg = Register::min_spill_reg(registers_, instr);
           spill(reg, instr);
           reg->clear();
 
@@ -622,6 +625,7 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     }
   } break;
   case IROp::PARAM: {
+    stack_accessed_ = true;
     auto block = instr->block();
     // try to minimise MOV SP, BP instructions within block
     // at first call remember the offset which was set,
@@ -630,7 +634,11 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     if (!call_seq_) {
       call_seq_ = true;
       if (!block->last_stack_offset()) {
-        print_instr(Op8086::MOV, "SP", "BP");
+        if (block->index() != 0) {
+          // no need to do this in the very first block, since BP was just set
+          // to SP
+          print_instr(Op8086::MOV, "SP", "BP");
+        }
         print_instr(Op8086::ADD, "SP", effective_offset(block->stack_offset()));
         block->set_last_stack_offset(block->stack_offset());
       } else {
@@ -647,12 +655,31 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
 
     auto addr = instr->arg1().addr();
     if (addr->is_dirty()) {
+      assert(addr->reg_count());
       print_instr(Op8086::PUSH, addr->get_register()->name());
     } else {
       print_instr(Op8086::PUSH, gen_addr(addr));
     }
   } break;
   case IROp::CALL:
+    stack_accessed_ = true;
+    if (!call_seq_) {
+      auto block = instr->block();
+      if (!block->last_stack_offset()) {
+        if (block->index() != 0) {
+          // no need to do this in the very first block, since BP was just set
+          // to SP
+          print_instr(Op8086::MOV, "SP", "BP");
+        }
+        print_instr(Op8086::ADD, "SP", effective_offset(block->stack_offset()));
+        block->set_last_stack_offset(block->stack_offset());
+      } else {
+        auto loff = *block->last_stack_offset();
+        auto diff = block->stack_offset() - loff;
+        print_instr(Op8086::ADD, "SP", diff * 2);
+        block->set_last_stack_offset(block->stack_offset());
+      }
+    }
     call_seq_ = false;
     // AX is reserved for WORD return
     spill(ax, instr);
@@ -674,7 +701,9 @@ void CodeGen8086::gen_instr(IRInstr *instr) {
     if (instr->has_arg1()) {
       // there is return value
       auto arg = instr->arg1().addr();
-      if (!ax->contains(arg)) {
+      bool contained = ax->contains(arg);
+      spill(ax, instr);
+      if (!contained) {
         if (!arg->is_dirty()) {
           print_instr(Op8086::MOV, "AX", gen_addr(arg));
         } else {
@@ -733,9 +762,8 @@ void CodeGen8086::gen_proc(IRProc *proc) {
     // and if the stack is ever used
     dry_run_ = true;
     stack_accessed_ = false;
-    for (auto &reg : registers_) {
-      reg->reset();
-    }
+    reset_registers();
+    reset_globals();
     for (auto &block : proc->blocks()) {
       gen_block(block.get());
     }
@@ -756,6 +784,9 @@ void CodeGen8086::gen_proc(IRProc *proc) {
       print_instr(Op8086::MOV, "BP", "SP");
     }
   }
+
+  reset_registers(false);
+  reset_globals();
   for (auto &block : proc->blocks()) {
     gen_block(block.get());
   }
@@ -811,10 +842,10 @@ void CodeGen8086::spill(Register *reg, IRInstr *instr, IRAddress *except,
       }
     }
   }
-  for (auto itr = reg->addresses().begin(); itr != reg->addresses().end();) {
-    auto &addr = *itr;
+  for (auto &addr : reg->addresses()) {
     if (addr != except) {
-      if (instr->next_use().contains(addr)) {
+      // globals always need to be spilled
+      if (instr->next_use().contains(addr) || addr->is_global()) {
         /* no use saving information which is never used again */
         if (addr->is_dirty() && addr->reg_count() == 1) {
           /* only store value if value is not up to date  and not saved
@@ -822,9 +853,15 @@ void CodeGen8086::spill(Register *reg, IRInstr *instr, IRAddress *except,
           store(reg, addr);
         }
       }
-      // this iterator might be invalidated after remove -_-
-      ++itr;
-      addr->remove_register(reg);
+      /* we don't want to invalidate our iterator -_- */
+      addr->remove_register(reg, false);
+    }
+  }
+  if (except) {
+    bool contained_except = reg->contains(except);
+    reg->clear();
+    if (contained_except) {
+      reg->add_address(except);
     }
   }
 }
@@ -833,7 +870,7 @@ void CodeGen8086::spill(Register *reg, IRInstr *instr,
                         std::set<IRAddress *> except) {
   for (auto &addr : reg->addresses()) {
     if (!except.contains(addr)) {
-      if (instr->next_use().contains(addr)) {
+      if (instr->next_use().contains(addr) || addr->is_global()) {
         /* no use saving information which is never used again */
         if (addr->is_dirty() && addr->reg_count() == 1) {
           /* only store value if value is not up to date  and not saved
@@ -959,4 +996,10 @@ void CodeGen8086::gen() {
   }
   out_file_ << built_in << std::endl;
   out_file_ << "END main" << std::endl;
+}
+
+void CodeGen8086::reset_registers(bool clear_access) {
+  for (auto &reg : registers_) {
+    reg->reset(clear_access);
+  }
 }
