@@ -811,7 +811,8 @@ void CodeGen8086::spill(Register *reg, IRInstr *instr, IRAddress *except,
       }
     }
   }
-  for (auto &addr : reg->addresses()) {
+  for (auto itr = reg->addresses().begin(); itr != reg->addresses().end();) {
+    auto &addr = *itr;
     if (addr != except) {
       if (instr->next_use().contains(addr)) {
         /* no use saving information which is never used again */
@@ -821,6 +822,8 @@ void CodeGen8086::spill(Register *reg, IRInstr *instr, IRAddress *except,
           store(reg, addr);
         }
       }
+      // this iterator might be invalidated after remove -_-
+      ++itr;
       addr->remove_register(reg);
     }
   }
