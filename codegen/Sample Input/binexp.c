@@ -1,4 +1,3 @@
-
 int binexp(int a, int b){
 	if(b == 0) {
 		return 1;
@@ -15,5 +14,5 @@ int binexp(int a, int b){
 }
 
 int main(){
-	println(binexp(2, 10));
+	println(binexp(2, 12));
 }
