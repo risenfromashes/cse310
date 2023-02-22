@@ -6,6 +6,7 @@
 
 #include <fstream>
 
+class Expr;
 struct IRGenContext {
   const bool global_scope;
   IRGenContext(bool global = false) : global_scope(global) {}
@@ -64,6 +65,7 @@ public:
   void visit_ref_expr(RefExpr *ref_expr) override;
   void visit_call_expr(CallExpr *call_expr) override;
 
+  void store_array(ArraySubscriptExpr* arr, VarOrImmediate arg, ASTNode* n);
   void
   visit_array_subscript_expr(ArraySubscriptExpr *array_subscript_expr) override;
 

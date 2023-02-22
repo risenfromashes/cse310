@@ -57,7 +57,7 @@ std::ostream &operator<<(std::ostream &os, const VarOrImmediate &a) {
   } else if (std::holds_alternative<double>(a.data_)) {
     os << std::get<double>(a.data_);
   }
-  return os;
+ return os;
 }
 
 void IRGenerator::gen_conditional_jump(ASTNode *n) {
@@ -294,6 +294,20 @@ void IRGenerator::visit_translation_unit_decl(TranslationUnitDecl *trans_decl) {
   }
 }
 
+void IRGenerator::store_array(ArraySubscriptExpr* arr, VarOrImmediate arg, ASTNode* n){
+      auto cnst = arr->subscript()->const_eval();
+      if (cnst) {
+        arr->array()->visit(this);
+        print_ir_instr(IROp::PTRST, arg, current_var_, *cnst, n);
+      } else {
+        arr->array()->visit(this);
+        auto ptr = current_var_;
+        arr->subscript()->visit(this);
+        auto subs = current_var_;
+        print_ir_instr(IROp::PTRST, arg, ptr, subs, n);
+      }
+}
+
 void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
   auto n = unary_expr;
   using enum UnaryOp;
@@ -319,6 +333,8 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
 
   /* don't generate jumps by default*/
   jump_ = false;
+
+  auto* array = dynamic_cast<ArraySubscriptExpr*>(unary_expr->operand());
 
   VarOrImmediate arg;
   if (const_eval) {
@@ -354,19 +370,35 @@ void IRGenerator::visit_unary_expr(UnaryExpr *unary_expr) {
     break;
   case PRE_INC:
     print_ir_instr(IROp::INC, arg, arg, n);
+    if(array){
+      store_array(array, arg, n);
+    }
     current_var_ = arg.str();
     break;
   case PRE_DEC:
     print_ir_instr(IROp::DEC, arg, arg, n);
+    if(array){
+      store_array(array, arg, n);
+    }
     current_var_ = arg.str();
     break;
   case POST_INC:
     print_ir_instr(IROp::COPY, new_temp(), arg, n);
     print_ir_instr(IROp::INC, arg, arg, n);
+    if(array){
+      auto t = current_var_;
+      store_array(array, arg, n);
+      current_var_ = t;
+    }
     break;
   case POST_DEC:
     print_ir_instr(IROp::COPY, new_temp(), arg, n);
     print_ir_instr(IROp::DEC, arg, arg, n);
+    if(array){
+      auto t = current_var_;
+      store_array(array, arg, n);
+      current_var_ = t;
+    }
     break;
   case POINTER_DEREF:
     print_ir_instr(IROp::PTRLD, new_temp(), arg, 0, n);
@@ -455,21 +487,11 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
   switch (binary_expr->op()) {
   case ASSIGN: {
     if (auto arr = dynamic_cast<ArraySubscriptExpr *>(l)) {
-      auto cnst = arr->subscript()->const_eval();
-      if (!const_eval2) {
-        r->visit(this);
-        arg2 = current_var_;
+      if(!const_eval2){
+          r->visit(this);
+          arg2 = current_var_;
       }
-      if (cnst) {
-        arr->array()->visit(this);
-        print_ir_instr(IROp::PTRST, arg2, current_var_, *cnst, n);
-      } else {
-        arr->array()->visit(this);
-        auto ptr = current_var_;
-        arr->subscript()->visit(this);
-        auto subs = current_var_;
-        print_ir_instr(IROp::PTRST, arg2, ptr, subs, n);
-      }
+      store_array(arr, arg2, n);
     } else if (auto unry = dynamic_cast<UnaryExpr *>(l)) {
       if (unry->op() == UnaryOp::POINTER_DEREF) {
         if (!const_eval2) {
@@ -487,6 +509,11 @@ void IRGenerator::visit_binary_expr(BinaryExpr *binary_expr) {
       if (!const_eval2) {
         r->visit(this);
         arg2 = current_var_;
+      }
+      if(arg1.is_str() && arg2.is_str()){
+        if(arg1.str() == arg2.str()){
+          break;
+        }
       }
       print_ir_instr(IROp::COPY, arg1, arg2, n);
     }
